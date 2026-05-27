@@ -84,6 +84,55 @@ nf_forbidden_grep() {
   fi
 }
 
+@test "manifest: no \${{...}} expressions inside any description block" {
+  # The earlier per-context tests (job/needs/secrets/matrix/vars) catch the
+  # most common manifest-evaluation bombs by name. This one is the catch-all
+  # for the *class*: any `${{ ... }}` inside a `description:` field is wrong
+  # because the runner evaluates it at manifest-load time, before steps run,
+  # and the example expression won't resolve. v1.6.0 shipped with literal
+  # `${{ steps.send.outputs.message_id }}` inside the edit_message_id
+  # description and broke every workflow pulling jtprogru/notiflow@v1.
+  run awk '
+    BEGIN { in_desc = 0; base_indent = 0; err = 0 }
+    /^[[:space:]]+description:/ {
+      base_indent = match($0, /[^ ]/) - 1
+      in_desc = 1
+      if ($0 ~ /\$\{\{/) {
+        printf "%d: %s\n", NR, $0
+        err = 1
+      }
+      next
+    }
+    in_desc {
+      if ($0 ~ /^[[:space:]]*$/) { next }
+      indent = match($0, /[^ ]/) - 1
+      if (indent <= base_indent) {
+        in_desc = 0
+        # check whether the closing line itself starts a new description
+        if ($0 ~ /^[[:space:]]+description:/) {
+          base_indent = indent
+          in_desc = 1
+          if ($0 ~ /\$\{\{/) {
+            printf "%d: %s\n", NR, $0
+            err = 1
+          }
+        }
+        next
+      }
+      if ($0 ~ /\$\{\{/) {
+        printf "%d: %s\n", NR, $0
+        err = 1
+      }
+    }
+    END { exit err }
+  ' "$ACTION_YML"
+  [ "$status" -eq 0 ] || {
+    echo "literal \${{...}} found inside a description block:" >&2
+    echo "$output" >&2
+    return 1
+  }
+}
+
 @test "manifest: status input is required and has no default" {
   # Parse the `status:` input block (until the next top-level input key) and
   # verify it declares required: true and no default: field.

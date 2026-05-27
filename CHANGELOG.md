@@ -2,6 +2,13 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.1] — 2026-05-27
+
+### Fixed
+
+- **Critical:** `action.yml` shipped in v1.6.0 contained a literal `${{ steps.send.outputs.message_id }}` example inside the `edit_message_id` description. GitHub evaluates `${{ ... }}` in `description:` fields at manifest-load time (the same trap that broke v1.0.0 with `${{ job.status }}`), so every workflow pulling `jtprogru/notiflow@v1` aborted with `Unrecognized named-value: 'steps'` before any step ran. Rewrote the description without the inline expression.
+- `tests/manifest.bats`: new test scans every `description:` block (folded or block scalar) and forbids any `${{` inside. The previous per-context tests (`job`/`needs`/`secrets`/`matrix`/`vars`) didn't cover `steps.*`, and a name-specific guard would have false-positived on the legitimate `${{ steps.notiflow.outputs.X }}` in `outputs.value`. This generic guard catches the whole bug class.
+
 ## [1.6.0] — 2026-05-27
 
 ### Added

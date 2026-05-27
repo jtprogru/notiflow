@@ -74,9 +74,9 @@ inputs:
       If set, the message is edited via editMessageText instead of sent fresh.
       Accepts an integer for single-chat, or a comma-separated list whose length
       must match chat_id for multi-chat (paired by index). Typically wired from
-      a previous notiflow step: edit_message_id: ${{ steps.send.outputs.message_id }}.
-      disable_notification and message_thread_id are silently dropped when editing
-      — Telegram rejects them on edit.
+      the message_id output of a previous notiflow step — see the README for a
+      worked example. disable_notification and message_thread_id are silently
+      dropped when editing (Telegram rejects them on edit).
     required: false
     default: ''
 
