@@ -2,10 +2,18 @@
 #
 # Manifest sanity checks for action.yml.
 #
-# Catches the class of regressions where a composite action's input.default
-# references a context that GitHub Actions does not expose at manifest-load
-# time. The runner aborts before any step runs with:
-#   Unrecognized named-value: 'job' (or 'steps' / 'needs' / 'secrets').
+# Catches the class of regressions where the manifest references a GitHub
+# Actions context that is not exposed to composite-action manifests at load
+# time. The runner aborts before any step runs with messages like:
+#
+#   Unrecognized named-value: 'job'.
+#   Unrecognized named-value: 'needs'.
+#
+# Composite-action manifests evaluate ${{ ... }} expressions in `default:`,
+# `description:`, `env:`, and elsewhere — so a literal example like
+# `${{ job.status }}` in a description string blows up the same way the
+# original `default: ${{ job.status }}` did.
+#
 # See: https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
 
 load helpers
@@ -14,44 +22,64 @@ setup() {
   ACTION_YML="${NF_ROOT}/action.yml"
 }
 
+# nf_forbidden_grep <context_name>
+# Greps action.yml for any ${{ <context>. ... }} expression. Returns the
+# matching lines so the failing test prints something useful.
+nf_forbidden_grep() {
+  local ctx="$1"
+  grep -nE '\$\{\{[[:space:]]*'"$ctx"'\.' "$ACTION_YML" || true
+}
+
 @test "manifest: action.yml exists" {
   [ -f "$ACTION_YML" ]
 }
 
-@test "manifest: input defaults do not reference job context" {
-  # Any line that looks like `default: ${{ job.* }}` is illegal in composite
-  # action manifests, regardless of which input it lives under.
-  run grep -nE '^[[:space:]]*default:[[:space:]]*\$\{\{[[:space:]]*job\.' "$ACTION_YML"
-  if [ "$status" -eq 0 ]; then
-    echo "forbidden 'job' context in default:" >&2
-    echo "$output" >&2
+@test "manifest: no \${{ job.* }} anywhere in action.yml" {
+  local hits
+  hits=$(nf_forbidden_grep job)
+  if [ -n "$hits" ]; then
+    echo "forbidden 'job' context (composite-action manifests do not expose it):" >&2
+    echo "$hits" >&2
     return 1
   fi
 }
 
-@test "manifest: input defaults do not reference steps context" {
-  run grep -nE '^[[:space:]]*default:[[:space:]]*\$\{\{[[:space:]]*steps\.' "$ACTION_YML"
-  if [ "$status" -eq 0 ]; then
-    echo "forbidden 'steps' context in default:" >&2
-    echo "$output" >&2
+@test "manifest: no \${{ needs.* }} anywhere in action.yml" {
+  local hits
+  hits=$(nf_forbidden_grep needs)
+  if [ -n "$hits" ]; then
+    echo "forbidden 'needs' context:" >&2
+    echo "$hits" >&2
     return 1
   fi
 }
 
-@test "manifest: input defaults do not reference needs context" {
-  run grep -nE '^[[:space:]]*default:[[:space:]]*\$\{\{[[:space:]]*needs\.' "$ACTION_YML"
-  if [ "$status" -eq 0 ]; then
-    echo "forbidden 'needs' context in default:" >&2
-    echo "$output" >&2
+@test "manifest: no \${{ secrets.* }} anywhere in action.yml" {
+  local hits
+  hits=$(nf_forbidden_grep secrets)
+  if [ -n "$hits" ]; then
+    echo "forbidden 'secrets' context (must come in through an input):" >&2
+    echo "$hits" >&2
     return 1
   fi
 }
 
-@test "manifest: input defaults do not reference secrets context" {
-  run grep -nE '^[[:space:]]*default:[[:space:]]*\$\{\{[[:space:]]*secrets\.' "$ACTION_YML"
-  if [ "$status" -eq 0 ]; then
-    echo "forbidden 'secrets' context in default:" >&2
-    echo "$output" >&2
+@test "manifest: no \${{ matrix.* }} anywhere in action.yml" {
+  local hits
+  hits=$(nf_forbidden_grep matrix)
+  if [ -n "$hits" ]; then
+    echo "forbidden 'matrix' context:" >&2
+    echo "$hits" >&2
+    return 1
+  fi
+}
+
+@test "manifest: no \${{ vars.* }} anywhere in action.yml" {
+  local hits
+  hits=$(nf_forbidden_grep vars)
+  if [ -n "$hits" ]; then
+    echo "forbidden 'vars' context (must come in through an input):" >&2
+    echo "$hits" >&2
     return 1
   fi
 }

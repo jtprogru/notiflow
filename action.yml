@@ -16,10 +16,10 @@ inputs:
   status:
     description: >-
       Job status to report. Must be passed explicitly from the workflow,
-      typically as ${{ job.status }} or ${{ needs.<job>.result }}.
-      Allowed values: success | failure | cancelled | skipped.
-      (Cannot be defaulted from job.status here — composite action `default`
-      fields do not have access to the `job` context.)
+      typically from the job.status or needs.<job>.result expression.
+      Allowed values: success, failure, cancelled, skipped.
+      Cannot be defaulted from job.status here — composite-action input
+      defaults do not have access to the job context.
     required: true
   parse_mode:
     description: 'Telegram parse_mode: MarkdownV2 (default), HTML, Markdown, or none.'
