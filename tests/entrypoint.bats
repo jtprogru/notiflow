@@ -59,13 +59,17 @@ teardown() {
   [[ "$output" == *"::warning::"* ]]
 }
 
-@test "entrypoint: status default from JOB_STATUS env (REQ-1.3, CP-16)" {
+@test "entrypoint: missing NF_STATUS exits 10 with no HTTP call (REQ-1.3, CP-16)" {
+  # status is now required. The legacy JOB_STATUS fallback was removed when
+  # default: ${{ job.status }} was dropped from action.yml — that context is
+  # not available inside composite-action `default` fields.
   mock_telegram_start "200:success"
   unset NF_STATUS
   export JOB_STATUS="success"
   run "${NF_ROOT}/scripts/entrypoint.sh"
-  [ "$status" -eq 0 ]
-  [ "$(count_mock_requests)" -eq 1 ]
+  [ "$status" -eq 10 ]
+  [ "$(count_mock_requests)" -eq 0 ]
+  [[ "$output" == *"MISSING_REQUIRED_INPUT"* ]]
 }
 
 @test "entrypoint: token only appears in mask directive (CP-11)" {

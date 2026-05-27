@@ -58,11 +58,20 @@ run_validate() {
   [[ "$output" == *"INVALID_CHAT_ID"* ]]
 }
 
-@test "validate: status default from JOB_STATUS env" {
+@test "validate: missing status exits 10" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="1" NF_STATUS=""
+  run run_validate
+  [ "$status" -eq 10 ]
+  [[ "$output" == *"MISSING_REQUIRED_INPUT"* ]]
+}
+
+@test "validate: JOB_STATUS env is no longer a fallback" {
+  # status must be passed explicitly — legacy JOB_STATUS fallback was removed
+  # when default: ${{ job.status }} was dropped from action.yml.
   export NF_BOT_TOKEN="t" NF_CHAT_ID="1" NF_STATUS="" JOB_STATUS="success"
   run run_validate
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"NF_STATUS=success"* ]]
+  [ "$status" -eq 10 ]
+  [[ "$output" == *"MISSING_REQUIRED_INPUT"* ]]
 }
 
 @test "validate: invalid status exits 12" {

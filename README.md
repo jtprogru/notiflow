@@ -33,7 +33,7 @@ jobs:
 |------|----------|---------|-------------|
 | `bot_token` | yes | — | Telegram bot token (store as a secret). |
 | `chat_id` | yes | — | Target chat ID (integer, possibly negative) or `@channel_username`. |
-| `status` | no | `${{ job.status }}` | Job status. Allowed: `success`, `failure`, `cancelled`, `skipped`. |
+| `status` | yes | — | Job status. Must be passed explicitly (typically `${{ job.status }}` or `${{ needs.<job>.result }}`). Allowed: `success`, `failure`, `cancelled`, `skipped`. |
 | `parse_mode` | no | `MarkdownV2` | `MarkdownV2`, `HTML`, `Markdown`, or `none`. |
 | `notify_on` | no | `success,failure,cancelled` | Comma-separated statuses that trigger a notification. |
 | `message` | no | _empty_ | Verbatim message. Bypasses templates and placeholder substitution. |
@@ -98,6 +98,7 @@ Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<
   with:
     bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
     chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
+    status:    ${{ job.status }}
     message_template: |
       {{.StatusEmoji}} *{{.Workflow}}* on `{{.Repo}}`@`{{.Branch}}`
       by *{{.Actor}}* — [open run]({{.RunUrl}})
@@ -110,6 +111,7 @@ Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<
   with:
     bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
     chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
+    status:    ${{ job.status }}
     template_success: "✅ {{.Repo}} build {{.RunNumber}} is green"
     template_failure: |
       ❌ {{.Repo}} build {{.RunNumber}} *FAILED*
@@ -135,6 +137,7 @@ Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<
   with:
     bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
     chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
+    status:    ${{ job.status }}
     message_thread_id: '123'
 ```
 
@@ -145,6 +148,7 @@ Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<
   with:
     bot_token:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
     chat_id:    ${{ secrets.TELEGRAM_CHAT_ID }}
+    status:     ${{ job.status }}
     parse_mode: 'HTML'
     message_template: |
       <b>{{.Workflow}}</b> @ <code>{{.Repo}}</code>
@@ -160,6 +164,7 @@ Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<
   with:
     bot_token:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
     chat_id:    ${{ secrets.TELEGRAM_CHAT_ID }}
+    status:     ${{ job.status }}
     parse_mode: 'none'
     message:    'Plain text alert — no placeholders, no escaping'
 ```

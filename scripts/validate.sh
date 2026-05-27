@@ -24,8 +24,8 @@ _nf::_in_set() {
 
 nf::validate() {
   # Required inputs.
-  if [ -z "${NF_BOT_TOKEN:-}" ] || [ -z "${NF_CHAT_ID:-}" ]; then
-    nf::log error "MISSING_REQUIRED_INPUT: bot_token and chat_id are required"
+  if [ -z "${NF_BOT_TOKEN:-}" ] || [ -z "${NF_CHAT_ID:-}" ] || [ -z "${NF_STATUS:-}" ]; then
+    nf::log error "MISSING_REQUIRED_INPUT: bot_token, chat_id and status are required"
     exit 10
   fi
 
@@ -52,10 +52,9 @@ nf::validate() {
       ;;
   esac
 
-  # status: default from JOB_STATUS, then validate.
-  if [ -z "${NF_STATUS:-}" ]; then
-    NF_STATUS="${JOB_STATUS:-}"
-  fi
+  # status: must be one of the allowed values. Caller passes it from the workflow
+  # (typically ${{ job.status }} or ${{ needs.<job>.result }}) — composite action
+  # `default` fields cannot reference the `job` context, so no fallback here.
   if ! _nf::_in_set "$NF_STATUS" "success failure cancelled skipped"; then
     nf::log error "INVALID_STATUS: '$NF_STATUS' (allowed: success|failure|cancelled|skipped)"
     exit 12
