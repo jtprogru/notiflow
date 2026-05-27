@@ -53,6 +53,27 @@ _nf::_build_json() {
     '
 }
 
+# _nf::_resolve_api_base <candidate>
+# Returns a safe Telegram API base URL. The default is api.telegram.org; a
+# loopback URL is also accepted so the bats mock server can intercept. Any
+# other value (including userinfo-tricked URLs like http://127.0.0.1@evil.com
+# or look-alikes like https://api.telegram.org.evil.com) is rejected with a
+# warning and replaced by the default — env vars set by prior workflow steps
+# cannot redirect the bot token to an attacker-controlled host.
+_nf::_resolve_api_base() {
+  local base="$1"
+  if [[ "$base" =~ ^https://api\.telegram\.org(/.*)?$ ]]; then
+    printf '%s' "$base"
+    return
+  fi
+  if [[ "$base" =~ ^https?://(127\.0\.0\.1|localhost)(:[0-9]+)?(/.*)?$ ]]; then
+    printf '%s' "$base"
+    return
+  fi
+  nf::log warn "ignoring NF_API_BASE='$base' (host not allowed); using default"
+  printf 'https://api.telegram.org'
+}
+
 # _nf::_post <json>
 # Performs one HTTP POST. Prints "<http_code>\n<body>".
 # Timeouts are bounded so a hung peer cannot stall the workflow:
@@ -62,7 +83,8 @@ _nf::_build_json() {
 # network error and applies the same backoff/retry path as a 5xx.
 _nf::_post() {
   local json="$1"
-  local base="${NF_API_BASE:-https://api.telegram.org}"
+  local base
+  base=$(_nf::_resolve_api_base "${NF_API_BASE:-https://api.telegram.org}")
   local url="${base}/bot${NF_BOT_TOKEN}/sendMessage"
   local connect_timeout="${NF_CONNECT_TIMEOUT:-5}"
   local max_time="${NF_MAX_TIME:-15}"

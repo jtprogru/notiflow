@@ -86,14 +86,6 @@ _nf::_escape_value() {
   esac
 }
 
-# _nf::_sed_rhs_escape <text>
-# Escapes characters that have special meaning on the RHS of sed s/// : & / and \.
-# Newlines are not expected in placeholder values; if present, they are stripped
-# to keep the substitution single-line-safe across BSD/GNU sed.
-_nf::_sed_rhs_escape() {
-  printf '%s' "$1" | tr -d '\n' | sed -e 's/[\\&/]/\\&/g'
-}
-
 nf::render() {
   # NF_MESSAGE (REQ-5.1): full passthrough, no placeholder substitution, no escape.
   if [ -n "${NF_MESSAGE:-}" ]; then
@@ -104,12 +96,14 @@ nf::render() {
   local template
   template=$(_nf::_pick_template)
 
-  local key value escaped_value rhs
+  # Substitution uses bash parameter expansion rather than sed. This preserves
+  # newlines inside placeholder values (e.g. a multi-line workflow name) and
+  # eliminates the RHS-escape dance for / & \ that sed s/// would need.
+  local key value escaped_value
   for key in $_NF_PLACEHOLDER_KEYS; do
     value=$(_nf::_placeholder_value "$key") || value=""
     escaped_value=$(_nf::_escape_value "$value")
-    rhs=$(_nf::_sed_rhs_escape "$escaped_value")
-    template=$(printf '%s' "$template" | sed "s/{{\\.$key}}/$rhs/g")
+    template=${template//"{{.$key}}"/$escaped_value}
   done
 
   # Warn and strip unknown placeholders that remain.
@@ -121,8 +115,8 @@ nf::render() {
       name=${stray#'{{.'}
       name=${name%'}}'}
       nf::log warn "UNKNOWN_PLACEHOLDER:$name"
+      template=${template//"$stray"/}
     done
-    template=$(printf '%s' "$template" | sed -E 's/\{\{\.[A-Za-z][A-Za-z0-9]*\}\}//g')
   fi
 
   _nf::_truncate "$template"

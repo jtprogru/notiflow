@@ -2,6 +2,21 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.2] — 2026-05-27
+
+### Fixed
+
+- `scripts/render.sh`: placeholder substitution is now done with bash parameter expansion (`${var//pat/repl}`) instead of `sed s///`. The old path piped each value through `tr -d '\n' | sed -e 's/[\\&/]/\\&/g'`, which silently stripped newlines from placeholder values (e.g. a multi-line workflow name) and required a fragile RHS-escape dance for `/`, `&`, and `\`. The new path is faster (no `sed` fork per placeholder, ×16 per render) and preserves arbitrary value content literally. Dead helper `_nf::_sed_rhs_escape` removed.
+
+### Security
+
+- `scripts/send.sh`: new `_nf::_resolve_api_base` allowlist guards the Telegram API base URL. Only `https://api.telegram.org` or a loopback URL (`http://127.0.0.1:*` / `http://localhost:*`, for the test mock) is honored; any other value of `NF_API_BASE` — including userinfo tricks (`http://127.0.0.1@evil.com`), look-alike subdomains (`https://api.telegram.org.evil.com`), and protocol downgrades (`http://api.telegram.org`) — is rejected with a `::warning::` and replaced by the default. Closes the channel through which an earlier malicious step in the same workflow job could have redirected the bot token to an attacker-controlled host.
+
+### Added
+
+- `tests/render.bats`: newline preservation and literal-value (sed metachar) tests.
+- `tests/send.bats`: API-base allowlist parameter tests covering the accept path and four classes of exfiltration attempt.
+
 ## [1.3.1] — 2026-05-27
 
 ### Fixed

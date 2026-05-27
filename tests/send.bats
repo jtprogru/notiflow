@@ -226,6 +226,30 @@ EOF
   [ "$(head -n1 "$sleep_log")" = "60" ]
 }
 
+@test "send: NF_API_BASE allowlist accepts api.telegram.org and loopback" {
+  [ "$(_nf::_resolve_api_base 'https://api.telegram.org')" = "https://api.telegram.org" ]
+  [ "$(_nf::_resolve_api_base 'https://api.telegram.org/bot123/sendMessage')" = "https://api.telegram.org/bot123/sendMessage" ]
+  [ "$(_nf::_resolve_api_base 'http://127.0.0.1:8080')" = "http://127.0.0.1:8080" ]
+  [ "$(_nf::_resolve_api_base 'http://localhost:8080')" = "http://localhost:8080" ]
+  [ "$(_nf::_resolve_api_base 'http://127.0.0.1:8080/path')" = "http://127.0.0.1:8080/path" ]
+}
+
+@test "send: NF_API_BASE allowlist rejects exfiltration attempts" {
+  # Arbitrary host
+  [ "$(_nf::_resolve_api_base 'https://evil.com' 2>/dev/null)" = "https://api.telegram.org" ]
+  # Userinfo trick — curl would resolve evil.com, not 127.0.0.1
+  [ "$(_nf::_resolve_api_base 'http://127.0.0.1:8080@evil.com' 2>/dev/null)" = "https://api.telegram.org" ]
+  # Look-alike subdomain
+  [ "$(_nf::_resolve_api_base 'https://api.telegram.org.evil.com' 2>/dev/null)" = "https://api.telegram.org" ]
+  # http (not https) for api.telegram.org → rejected too, avoid downgrade
+  [ "$(_nf::_resolve_api_base 'http://api.telegram.org' 2>/dev/null)" = "https://api.telegram.org" ]
+  # Each rejection logs a warning.
+  local err
+  err=$(_nf::_resolve_api_base 'https://evil.com' 2>&1 >/dev/null)
+  [[ "$err" == *"warning"* ]]
+  [[ "$err" == *"evil.com"* ]]
+}
+
 @test "send: NF_CONNECT_TIMEOUT and NF_MAX_TIME override defaults" {
   export NF_CONNECT_TIMEOUT=3
   export NF_MAX_TIME=7

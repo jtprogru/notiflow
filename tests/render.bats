@@ -164,6 +164,28 @@ setup() {
   ! printf '%s' "$result" | grep -q $'�'
 }
 
+@test "render: placeholder value with embedded newline survives substitution" {
+  # The old sed-based substitution stripped \n via `tr -d '\n'`. The bash
+  # parameter-expansion replacement preserves them. Workflow names in
+  # particular can contain newlines (it's a free-form string from the user).
+  export NF_STATUS=success NF_PARSE_MODE=none
+  export GITHUB_WORKFLOW=$'line1\nline2'
+  result=$(NF_MESSAGE_TEMPLATE='before {{.Workflow}} after' nf::render)
+  [ "$result" = $'before line1\nline2 after' ]
+}
+
+@test "render: placeholder value with sed-metachars / & \\\\ is literal" {
+  # The old code escaped these for sed RHS. Bash param-expansion replacement
+  # treats the value literally — no double-escape, no second-order injection.
+  export NF_STATUS=success NF_PARSE_MODE=none
+  export GITHUB_REPOSITORY='owner/repo'
+  result=$(NF_MESSAGE_TEMPLATE='{{.Repo}}' nf::render)
+  [ "$result" = 'owner/repo' ]
+  export GITHUB_REPOSITORY='a&b\c'
+  result=$(NF_MESSAGE_TEMPLATE='{{.Repo}}' nf::render)
+  [ "$result" = 'a&b\c' ]
+}
+
 @test "utf16_units: counts BMP=1 and supplementary=2 (CP-UTF16)" {
   [ "$(_nf::_utf16_units '')" -eq 0 ]
   [ "$(_nf::_utf16_units 'abc')" -eq 3 ]
