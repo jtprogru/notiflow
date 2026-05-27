@@ -72,6 +72,22 @@ teardown() {
   [[ "$output" == *"MISSING_REQUIRED_INPUT"* ]]
 }
 
+@test "entrypoint: nf::mask runs before nf::require_command (CP-11)" {
+  # Static invariant: the add-mask directive must be emitted before any
+  # require_command check, so a missing-dep failure can never leak the
+  # token through whatever logged the failure.
+  local script="${NF_ROOT}/scripts/entrypoint.sh"
+  local mask_line first_req_line
+  mask_line=$(awk '/^[^#]*nf::mask /{print NR; exit}' "$script")
+  first_req_line=$(awk '/^[^#]*nf::require_command/{print NR; exit}' "$script")
+  [ -n "$mask_line" ]
+  [ -n "$first_req_line" ]
+  [ "$mask_line" -lt "$first_req_line" ] || {
+    echo "nf::mask at line $mask_line must precede nf::require_command at line $first_req_line" >&2
+    return 1
+  }
+}
+
 @test "entrypoint: token only appears in mask directive (CP-11)" {
   mock_telegram_start "500:server_error,500:server_error,500:server_error,500:server_error"
   export NF_STATUS="failure"

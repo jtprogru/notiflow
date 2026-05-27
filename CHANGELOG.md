@@ -2,6 +2,16 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] — 2026-05-27
+
+### Fixed
+
+- `scripts/entrypoint.sh`: `nf::mask` for the bot token now runs **before** the `nf::require_command` checks for `curl`/`jq`/`iconv`. Defensive against forks that enable `set -x` or any future change that might log argv containing the token before the masking directive lands.
+- `scripts/lib.sh`: `nf::require_bash` now actually checks bash `>= 3.2`; previously `>= 3.0` would have passed (bash 3.0/3.1 lack array features we rely on). Refactored into `_nf::_bash_version_ok` so the comparison is unit-testable without forging `BASH_VERSINFO`.
+- `scripts/lib.sh`: `nf::set_output` falls back to `/dev/stderr` (not `/dev/stdout`) when `GITHUB_OUTPUT` is unset. Stops local runs from interleaving key=value lines with the rendered message body on stdout.
+- `scripts/validate.sh`: legacy `parse_mode: Markdown` is now explicitly upgraded to `MarkdownV2` with a `::warning::` annotation. Previously the escaper silently treated `Markdown` as V2 but the request still sent `parse_mode=Markdown` to Telegram — escape rules and parse_mode mismatched, producing broken or rejected messages. The dead branch in `_nf::_escape_value` is removed.
+- `tests/`: four new cases — static mask-order invariant, bash 3.2 boundary check, set_output stderr fallback, and Markdown→MarkdownV2 upgrade with warning annotation.
+
 ## [1.3.0] — 2026-05-27
 
 ### Fixed

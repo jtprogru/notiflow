@@ -82,7 +82,6 @@ _nf::_escape_value() {
   case "${NF_PARSE_MODE:-MarkdownV2}" in
     MarkdownV2) nf::escape_md_v2 "$1" ;;
     HTML) nf::escape_html "$1" ;;
-    Markdown) nf::escape_md_v2 "$1" ;; # treat legacy Markdown as MarkdownV2 for safety
     none | *) nf::escape_none "$1" ;;
   esac
 }

@@ -69,6 +69,13 @@ nf::validate() {
     nf::log error "INVALID_PARSE_MODE: '$NF_PARSE_MODE'"
     exit 13
   fi
+  # Legacy `Markdown` is silently upgraded to MarkdownV2: notiflow escapes
+  # placeholder values per MarkdownV2 rules, and sending parse_mode=Markdown
+  # to Telegram with V2 escaping produces broken or rejected messages.
+  if [ "$NF_PARSE_MODE" = "Markdown" ]; then
+    nf::log warn "parse_mode=Markdown upgraded to MarkdownV2 (notiflow escapes per V2 rules)"
+    NF_PARSE_MODE="MarkdownV2"
+  fi
   export NF_PARSE_MODE
 
   # notify_on: default success,failure,cancelled.

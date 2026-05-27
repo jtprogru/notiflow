@@ -40,3 +40,23 @@ setup() {
   [ "$status" -eq 22 ]
   [[ "$output" == *"MISSING_DEPENDENCY:definitely_not_a_real_command_xyz"* ]]
 }
+
+@test "lib: _nf::_bash_version_ok accepts >=3.2, rejects older" {
+  _nf::_bash_version_ok 3 2
+  _nf::_bash_version_ok 3 5
+  _nf::_bash_version_ok 4 0
+  _nf::_bash_version_ok 5 1
+  ! _nf::_bash_version_ok 3 1
+  ! _nf::_bash_version_ok 3 0
+  ! _nf::_bash_version_ok 2 9
+  ! _nf::_bash_version_ok 0 0
+}
+
+@test "lib: nf::set_output falls back to stderr (not stdout) when GITHUB_OUTPUT unset" {
+  unset GITHUB_OUTPUT
+  local stdout stderr
+  stdout=$(nf::set_output ok true 2>/dev/null)
+  [ -z "$stdout" ]
+  stderr=$(nf::set_output ok true 2>&1 >/dev/null)
+  [ "$stderr" = "ok=true" ]
+}

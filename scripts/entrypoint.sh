@@ -19,15 +19,17 @@ source "${NF_HOME}/render.sh"
 source "${NF_HOME}/send.sh"
 
 nf::require_bash "$@"
-nf::require_command curl
-nf::require_command jq
-nf::require_command iconv
 
-# Mask the token as the very first observable action so it never leaks
-# even when later steps fail.
+# Mask the bot token before any other observable action — including the
+# require_command checks below. If a fork enables `set -x` or a future change
+# logs an argv that contains the token, it stays masked.
 if [ -n "${NF_BOT_TOKEN:-}" ]; then
   nf::mask "$NF_BOT_TOKEN"
 fi
+
+nf::require_command curl
+nf::require_command jq
+nf::require_command iconv
 
 nf::validate
 

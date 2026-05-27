@@ -28,10 +28,11 @@ nf::mask() {
 }
 
 # nf::set_output <key> <value>
-# Appends key=value to $GITHUB_OUTPUT (or stdout if unset, for local runs).
+# Appends key=value to $GITHUB_OUTPUT (or stderr if unset, for local runs —
+# never stdout, which is reserved for the rendered message body).
 nf::set_output() {
   local key="$1" value="$2"
-  printf '%s=%s\n' "$key" "$value" >>"${GITHUB_OUTPUT:-/dev/stdout}"
+  printf '%s=%s\n' "$key" "$value" >>"${GITHUB_OUTPUT:-/dev/stderr}"
 }
 
 # nf::json_escape <value>
@@ -49,12 +50,22 @@ nf::require_command() {
   fi
 }
 
+# _nf::_bash_version_ok <major> <minor>
+# Returns 0 if the given bash version is >= 3.2 (the minimum we support).
+# Split out so tests can exercise the comparison without forging BASH_VERSINFO.
+_nf::_bash_version_ok() {
+  local major="$1" minor="$2"
+  [ "$major" -gt 3 ] && return 0
+  [ "$major" -eq 3 ] && [ "$minor" -ge 2 ] && return 0
+  return 1
+}
+
 # nf::require_bash
 # Verifies bash >= 3.2 (the minimum we support). Re-exec into a newer bash if
-# the current one is older (rare). Exits 20 if no suitable bash is found.
+# the current one is older (rare on macOS where system bash is 3.2 exactly).
+# Exits 20 if no suitable bash is found.
 nf::require_bash() {
-  local major="${BASH_VERSINFO[0]:-0}"
-  if [ "$major" -ge 3 ]; then
+  if _nf::_bash_version_ok "${BASH_VERSINFO[0]:-0}" "${BASH_VERSINFO[1]:-0}"; then
     return 0
   fi
   for candidate in /opt/homebrew/bin/bash /usr/local/bin/bash; do

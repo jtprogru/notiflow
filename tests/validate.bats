@@ -95,6 +95,17 @@ run_validate() {
   [[ "$output" == *"INVALID_PARSE_MODE"* ]]
 }
 
+@test "validate: parse_mode 'Markdown' upgraded to MarkdownV2" {
+  # Legacy `Markdown` is silently rewritten so escape rules and Telegram's
+  # parse_mode stay consistent (notiflow's escaper is V2-only).
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="1" NF_STATUS="success" NF_PARSE_MODE="Markdown"
+  run run_validate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NF_PARSE_MODE=MarkdownV2"* ]]
+  [[ "$output" == *"::warning::"* ]]
+  [[ "$output" == *"Markdown upgraded to MarkdownV2"* ]]
+}
+
 @test "validate: parse_mode 'none' accepted" {
   export NF_BOT_TOKEN="t" NF_CHAT_ID="1" NF_STATUS="success" NF_PARSE_MODE="none"
   run run_validate
