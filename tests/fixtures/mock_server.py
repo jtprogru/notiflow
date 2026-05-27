@@ -10,7 +10,8 @@ import json
 import os
 import sys
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 FIXTURES = {
     "success": (200, {"ok": True, "result": {"message_id": 42}}),
@@ -32,10 +33,12 @@ FIXTURES = {
     "unauthorized": (401, {"ok": False, "error_code": 401, "description": "Unauthorized"}),
     "forbidden": (403, {"ok": False, "error_code": 403, "description": "Forbidden"}),
     "not_found": (404, {"ok": False, "error_code": 404, "description": "Not Found"}),
+    # Sleeps --hang-seconds before responding 200. Used to test curl --max-time.
+    "hang": (200, {"ok": True, "result": {"message_id": 42}}),
 }
 
 
-def make_handler(responses, log_path, counter):
+def make_handler(responses, log_path, counter, hang_seconds):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # silence stderr noise
             pass
@@ -55,14 +58,27 @@ def make_handler(responses, log_path, counter):
 
             idx = min(counter["n"], len(responses) - 1)
             counter["n"] += 1
-            status, fixture = responses[idx]
-            payload = json.dumps(fixture).encode("utf-8")
+            status, fixture, name = responses[idx]
 
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload)
+            if name == "hang":
+                # Block long enough that curl --max-time fires first. Wrapped in
+                # try/except because the client likely closes the socket and the
+                # write below would otherwise raise BrokenPipeError into stderr.
+                try:
+                    time.sleep(hang_seconds)
+                except Exception:
+                    return
+
+            payload = json.dumps(fixture).encode("utf-8")
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            except (BrokenPipeError, ConnectionResetError):
+                # Client already gave up (e.g. timed out). Nothing to do.
+                pass
 
     return Handler
 
@@ -79,7 +95,7 @@ def parse_responses(spec):
         fixture = FIXTURES.get(name)
         if fixture is None:
             raise ValueError(f"unknown fixture: {name!r}")
-        items.append((int(status_str), fixture[1]))
+        items.append((int(status_str), fixture[1], name))
     if not items:
         raise ValueError("no responses provided")
     return items
@@ -91,13 +107,16 @@ def main():
     ap.add_argument("--log", required=True)
     ap.add_argument("--port-file", required=True)
     ap.add_argument("--pid-file", required=True)
+    ap.add_argument("--hang-seconds", type=float, default=30.0,
+                    help="How long the 'hang' fixture blocks before responding.")
     args = ap.parse_args()
 
     responses = parse_responses(args.responses)
     counter = {"n": 0}
-    handler = make_handler(responses, args.log, counter)
+    handler = make_handler(responses, args.log, counter, args.hang_seconds)
 
-    server = HTTPServer(("127.0.0.1", 0), handler)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    server.daemon_threads = True
     port = server.server_address[1]
 
     with open(args.port_file, "w", encoding="utf-8") as fh:

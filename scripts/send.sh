@@ -55,11 +55,20 @@ _nf::_build_json() {
 
 # _nf::_post <json>
 # Performs one HTTP POST. Prints "<http_code>\n<body>".
+# Timeouts are bounded so a hung peer cannot stall the workflow:
+#   NF_CONNECT_TIMEOUT — TCP/TLS handshake budget (seconds, default 5)
+#   NF_MAX_TIME        — whole-request budget (seconds, default 15)
+# Exceeding either causes curl to exit non-zero; the caller treats this as a
+# network error and applies the same backoff/retry path as a 5xx.
 _nf::_post() {
   local json="$1"
   local base="${NF_API_BASE:-https://api.telegram.org}"
   local url="${base}/bot${NF_BOT_TOKEN}/sendMessage"
+  local connect_timeout="${NF_CONNECT_TIMEOUT:-5}"
+  local max_time="${NF_MAX_TIME:-15}"
   curl -sS -o - -w '\n%{http_code}' \
+    --connect-timeout "$connect_timeout" \
+    --max-time "$max_time" \
     -X POST \
     -H 'Content-Type: application/json' \
     --data-binary @- \

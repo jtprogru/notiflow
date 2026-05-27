@@ -131,3 +131,72 @@ teardown() {
   nf::send "hi" 2>"$logf" || true # we expect failure (400), only checking log
   ! grep -F -- "$NF_BOT_TOKEN" "$logf"
 }
+
+@test "send: --max-time triggers retry then success on hang" {
+  export NF_CONNECT_TIMEOUT=1
+  export NF_MAX_TIME=1
+  mock_telegram_start "200:hang,200:success"
+  local start end
+  start=$(date +%s)
+  run nf::send "hi"
+  end=$(date +%s)
+  [ "$status" -eq 0 ]
+  [ "$(count_mock_requests)" -eq 2 ]
+  assert_output_eq ok true
+  # First attempt times out in ~1s, 1s backoff, second succeeds. Budget < 10s.
+  [ $((end - start)) -lt 10 ]
+}
+
+@test "send: hung peer exhausts retries within bounded time" {
+  export NF_CONNECT_TIMEOUT=1
+  export NF_MAX_TIME=1
+  mock_telegram_start "200:hang,200:hang,200:hang,200:hang"
+  local start end
+  start=$(date +%s)
+  run nf::send "hi"
+  end=$(date +%s)
+  [ "$status" -eq 1 ]
+  [ "$(count_mock_requests)" -eq 4 ]
+  assert_output_eq ok false
+  assert_output_eq http_status 0
+  # 4 attempts × ~1s max-time + (1+2+4)s backoff ≈ 11s; budget < 20s.
+  [ $((end - start)) -lt 20 ]
+  # And it really did wait, not bail instantly.
+  [ $((end - start)) -ge 4 ]
+}
+
+@test "send: curl receives --connect-timeout and --max-time flags" {
+  # Stub curl in a temp PATH dir; record its argv and emit a synthetic 200.
+  local stub_dir="${BATS_TEST_TMPDIR}/stub"
+  local argv_log="${BATS_TEST_TMPDIR}/curl.argv"
+  mkdir -p "$stub_dir"
+  cat >"${stub_dir}/curl" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$@" >"${argv_log}"
+printf '{"ok":true,"result":{"message_id":42}}\n200\n'
+EOF
+  chmod +x "${stub_dir}/curl"
+  PATH="${stub_dir}:${PATH}" nf::send "hi"
+  grep -Fxq -- '--connect-timeout' "$argv_log"
+  grep -Fxq -- '--max-time' "$argv_log"
+  # Default values from send.sh.
+  awk 'p {print; exit} /^--connect-timeout$/ {p=1}' "$argv_log" | grep -Fxq '5'
+  awk 'p {print; exit} /^--max-time$/ {p=1}' "$argv_log" | grep -Fxq '15'
+}
+
+@test "send: NF_CONNECT_TIMEOUT and NF_MAX_TIME override defaults" {
+  export NF_CONNECT_TIMEOUT=3
+  export NF_MAX_TIME=7
+  local stub_dir="${BATS_TEST_TMPDIR}/stub"
+  local argv_log="${BATS_TEST_TMPDIR}/curl.argv"
+  mkdir -p "$stub_dir"
+  cat >"${stub_dir}/curl" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$@" >"${argv_log}"
+printf '{"ok":true,"result":{"message_id":42}}\n200\n'
+EOF
+  chmod +x "${stub_dir}/curl"
+  PATH="${stub_dir}:${PATH}" nf::send "hi"
+  awk 'p {print; exit} /^--connect-timeout$/ {p=1}' "$argv_log" | grep -Fxq '3'
+  awk 'p {print; exit} /^--max-time$/ {p=1}' "$argv_log" | grep -Fxq '7'
+}

@@ -2,6 +2,14 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-05-27
+
+### Added
+
+- `scripts/send.sh`: every Telegram request is now bounded by `curl --connect-timeout` and `--max-time`. Defaults are 5s for the TCP/TLS handshake and 15s for the whole request. Overridable via `NF_CONNECT_TIMEOUT` and `NF_MAX_TIME` environment variables (env-only, same pattern as `NF_API_BASE`). A hung Telegram peer can no longer stall the notify job indefinitely; timeouts surface as a network error and follow the existing 5xx backoff/retry path.
+- `tests/send.bats`: four new cases covering hang → retry → success, sustained hang exhausting retries within a bounded budget, and verification that the flags and their default/overridden values reach `curl`'s argv.
+- `tests/fixtures/mock_server.py`: new `hang` fixture that blocks before responding (`--hang-seconds`, default 30). Server promoted to `ThreadingHTTPServer` so a blocking request does not stall sibling requests during retry tests.
+
 ## [1.0.1] — 2026-05-27
 
 ### Fixed
