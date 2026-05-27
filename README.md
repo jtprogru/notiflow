@@ -174,13 +174,13 @@ Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<
 - **Token masking.** The first action `notiflow` takes is `::add-mask::<bot_token>`, so the token never leaks in subsequent log lines.
 - **Default `fail_on_error: false`.** Telegram delivery is a side-channel — when it fails (network, rate-limit exhausted, 4xx) the action still exits 0 with `ok=false`. Set `fail_on_error: true` to surface failures.
 - **Retry policy.** Up to 4 attempts. `429` honors `parameters.retry_after` from the response body. `5xx` and network errors use 1s/2s/4s exponential backoff. `4xx` other than `429` is final — no retry.
-- **Length limit.** Telegram caps messages at 4096 bytes. Longer renders are truncated to 4093 bytes + `...`.
+- **Length limit.** Telegram caps messages at 4096 UTF-16 code units. BMP codepoints (including Cyrillic) count as 1 unit each; supplementary-plane codepoints (most emoji) count as 2 each. Longer renders are truncated to 4093 units + `...`, aligned to codepoint boundaries.
 - **Verbatim `message`.** Bypasses both templating and escaping. With `parse_mode=MarkdownV2`/`HTML` you are responsible for valid markup.
 
 ## Requirements
 
-- A Linux, macOS, or Windows GitHub-hosted runner (defaults: bash, curl, jq are available).
-- For self-hosted runners: bash 3.2+, `curl`, `jq` on `PATH`.
+- A Linux, macOS, or Windows GitHub-hosted runner (defaults: bash, curl, jq, iconv are available).
+- For self-hosted runners: bash 3.2+, `curl`, `jq`, `iconv` on `PATH`.
 
 ## Development
 

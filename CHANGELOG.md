@@ -2,6 +2,22 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-05-27
+
+### Fixed
+
+- `scripts/render.sh`: message truncation now counts Telegram's actual unit — UTF-16 code units — instead of bash codepoints. Previously, supplementary-plane characters (most emoji) were undercounted by 2×, so emoji-heavy templates near the limit were silently delivered as `400 MESSAGE_TOO_LONG`. Truncation cuts at codepoint boundaries; a trailing unpaired surrogate from the byte-level cut is dropped via `iconv -c`, so no half-emoji ever leaks into the wire.
+
+### Added
+
+- `iconv` is now a required dependency. Hard-fails with `MISSING_DEPENDENCY:iconv` (exit 22, same path as `curl`/`jq`) if absent. GitHub-hosted runners already ship it on all three OSes; self-hosted runners need it on `PATH`.
+- `_nf::_utf16_units` helper, exposed for tests, counts UTF-16 code units of arbitrary UTF-8 input (BMP=1, supplementary=2).
+- `tests/render.bats`: five new cases covering Cyrillic passthrough at the boundary, Cyrillic truncation, supplementary-plane emoji counting as 2 units, codepoint-aligned emoji truncation (no half emoji / no U+FFFD), and a unit-count parameter test.
+
+### Changed
+
+- `README.md`: length-limit note and requirements section updated to reflect UTF-16 units and the new `iconv` dependency.
+
 ## [1.2.0] — 2026-05-27
 
 ### Added

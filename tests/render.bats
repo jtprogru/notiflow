@@ -100,7 +100,7 @@ setup() {
   [ "$result" = 'foo_bar/baz' ]
 }
 
-@test "render: truncate at 4096 bytes (REQ-5.7)" {
+@test "render: truncate ASCII at 4096 UTF-16 units (REQ-5.7)" {
   export NF_STATUS=success NF_PARSE_MODE=none
   big=$(printf 'a%.0s' $(seq 1 5000))
   NF_MESSAGE="$big" result=$(nf::render)
@@ -108,7 +108,7 @@ setup() {
   [ "${result: -3}" = "..." ]
 }
 
-@test "render: passthrough at exactly 4096 bytes" {
+@test "render: passthrough at exactly 4096 UTF-16 units" {
   export NF_STATUS=success NF_PARSE_MODE=none
   msg=$(printf 'a%.0s' $(seq 1 4096))
   NF_MESSAGE="$msg" result=$(nf::render)
@@ -122,6 +122,54 @@ setup() {
   NF_MESSAGE="$msg" result=$(nf::render)
   [ "${#result}" -eq 4096 ]
   [ "${result: -3}" = "..." ]
+}
+
+@test "render: BMP (Cyrillic) at 4096 codepoints passes through" {
+  export NF_STATUS=success NF_PARSE_MODE=none
+  # Each Cyrillic letter = 1 UTF-16 unit (BMP), 2 UTF-8 bytes.
+  msg=$(printf 'а%.0s' $(seq 1 4096))
+  NF_MESSAGE="$msg" result=$(nf::render)
+  [ "$(_nf::_utf16_units "$result")" -eq 4096 ]
+  [ "${result: -1}" = "а" ]
+}
+
+@test "render: BMP (Cyrillic) at 4097 codepoints truncates with ellipsis" {
+  export NF_STATUS=success NF_PARSE_MODE=none
+  msg=$(printf 'а%.0s' $(seq 1 4097))
+  NF_MESSAGE="$msg" result=$(nf::render)
+  [ "$(_nf::_utf16_units "$result")" -eq 4096 ]
+  [ "${result: -3}" = "..." ]
+}
+
+@test "render: supplementary-plane emoji each count as 2 UTF-16 units" {
+  # 😀 (U+1F600) = surrogate pair = 2 UTF-16 units. 2049 emoji = 4098 units.
+  msg=$(printf '😀%.0s' $(seq 1 2049))
+  export NF_STATUS=success NF_PARSE_MODE=none
+  NF_MESSAGE="$msg" result=$(nf::render)
+  # Must fit within Telegram's 4096-unit limit (the very thing the old
+  # codepoint-based truncator missed — it would have let 2049 emoji = 8192
+  # bytes through and Telegram would have returned 400 MESSAGE_TOO_LONG).
+  [ "$(_nf::_utf16_units "$result")" -le 4096 ]
+  [ "${result: -3}" = "..." ]
+}
+
+@test "render: emoji truncation preserves codepoint boundaries (no half emoji)" {
+  msg=$(printf '😀%.0s' $(seq 1 2049))
+  export NF_STATUS=success NF_PARSE_MODE=none
+  NF_MESSAGE="$msg" result=$(nf::render)
+  [ "${result: -3}" = "..." ]
+  # Any half-surrogate that survived would either appear as U+FFFD or push
+  # the unit count above the limit. The previous test guards the count;
+  # this one guards against silent corruption.
+  ! printf '%s' "$result" | grep -q $'�'
+}
+
+@test "utf16_units: counts BMP=1 and supplementary=2 (CP-UTF16)" {
+  [ "$(_nf::_utf16_units '')" -eq 0 ]
+  [ "$(_nf::_utf16_units 'abc')" -eq 3 ]
+  [ "$(_nf::_utf16_units 'абв')" -eq 3 ]
+  [ "$(_nf::_utf16_units '😀')" -eq 2 ]
+  [ "$(_nf::_utf16_units 'abc😀')" -eq 5 ]
 }
 
 # CP-4: template priority property test.

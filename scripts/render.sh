@@ -129,14 +129,36 @@ nf::render() {
   _nf::_truncate "$template"
 }
 
+# _nf::_utf16_units <text>
+# Echoes the UTF-16 code-unit count for <text>. This is the unit Telegram uses
+# for its 4096-character sendMessage limit: BMP codepoints (incl. Cyrillic) cost
+# 1 unit each, supplementary-plane codepoints (most emoji) cost 2 each.
+# `iconv -c` silently drops any malformed UTF-8 input.
+_nf::_utf16_units() {
+  local bytes
+  bytes=$(printf '%s' "$1" | iconv -c -f UTF-8 -t UTF-16LE 2>/dev/null | wc -c | tr -d ' ')
+  printf '%s' $((bytes / 2))
+}
+
 # _nf::_truncate <text>
-# Prints the input, but no more than 4096 bytes. If longer, the last 3 bytes become "...".
+# Echoes <text> unchanged if it fits in 4096 UTF-16 code units (Telegram's
+# sendMessage limit); otherwise echoes the first 4093 code units plus "...",
+# aligned to codepoint boundaries. A trailing unpaired high surrogate left by
+# the byte-level cut is silently dropped by `iconv -c`.
 _nf::_truncate() {
   local text="$1"
-  local len=${#text}
-  if [ "$len" -le 4096 ]; then
+  local limit=4096
+  local units
+  units=$(_nf::_utf16_units "$text")
+  if [ "$units" -le "$limit" ]; then
     printf '%s' "$text"
-  else
-    printf '%s' "${text:0:4093}..."
+    return
   fi
+  local max_bytes=$(((limit - 3) * 2))
+  local tmp
+  tmp=$(mktemp)
+  printf '%s' "$text" | iconv -c -f UTF-8 -t UTF-16LE 2>/dev/null >"$tmp"
+  head -c "$max_bytes" "$tmp" | iconv -c -f UTF-16LE -t UTF-8 2>/dev/null
+  rm -f "$tmp"
+  printf '...'
 }

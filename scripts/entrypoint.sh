@@ -21,6 +21,7 @@ source "${NF_HOME}/send.sh"
 nf::require_bash "$@"
 nf::require_command curl
 nf::require_command jq
+nf::require_command iconv
 
 # Mask the token as the very first observable action so it never leaks
 # even when later steps fail.
