@@ -69,6 +69,16 @@ inputs:
     description: 'If true, the action exits non-zero when the Telegram request ultimately fails. Default false keeps the job result intact.'
     required: false
     default: 'false'
+  edit_message_id:
+    description: >-
+      If set, the message is edited via editMessageText instead of sent fresh.
+      Accepts an integer for single-chat, or a comma-separated list whose length
+      must match chat_id for multi-chat (paired by index). Typically wired from
+      a previous notiflow step: edit_message_id: ${{ steps.send.outputs.message_id }}.
+      disable_notification and message_thread_id are silently dropped when editing
+      — Telegram rejects them on edit.
+    required: false
+    default: ''
 
 outputs:
   ok:
@@ -105,5 +115,6 @@ runs:
         NF_DISABLE_NOTIFICATION: ${{ inputs.disable_notification }}
         NF_MESSAGE_THREAD_ID: ${{ inputs.message_thread_id }}
         NF_FAIL_ON_ERROR: ${{ inputs.fail_on_error }}
+        NF_EDIT_MESSAGE_ID: ${{ inputs.edit_message_id }}
       run: |
         bash "${{ github.action_path }}/scripts/entrypoint.sh"

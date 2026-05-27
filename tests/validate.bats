@@ -173,6 +173,44 @@ run_validate() {
   [ "$status" -eq 0 ]
 }
 
+@test "validate: edit_message_id positive integer accepted (single chat)" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42" NF_STATUS="success" NF_PARSE_MODE="none"
+  export NF_EDIT_MESSAGE_ID="100"
+  run run_validate
+  [ "$status" -eq 0 ]
+}
+
+@test "validate: edit_message_id CSV matches chat_id length" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42,99,-100" NF_STATUS="success" NF_PARSE_MODE="none"
+  export NF_EDIT_MESSAGE_ID="100,200,300"
+  run run_validate
+  [ "$status" -eq 0 ]
+}
+
+@test "validate: edit_message_id CSV length mismatch exits 16" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42,99" NF_STATUS="success" NF_PARSE_MODE="none"
+  export NF_EDIT_MESSAGE_ID="100"
+  run run_validate
+  [ "$status" -eq 16 ]
+  [[ "$output" == *"INVALID_EDIT_MESSAGE_ID"* ]]
+  [[ "$output" == *"count mismatch"* ]]
+}
+
+@test "validate: edit_message_id non-integer item exits 16" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42,99" NF_STATUS="success" NF_PARSE_MODE="none"
+  export NF_EDIT_MESSAGE_ID="100,abc"
+  run run_validate
+  [ "$status" -eq 16 ]
+  [[ "$output" == *"INVALID_EDIT_MESSAGE_ID: 'abc'"* ]]
+}
+
+@test "validate: edit_message_id negative integer rejected (must be positive)" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42" NF_STATUS="success" NF_PARSE_MODE="none"
+  export NF_EDIT_MESSAGE_ID="-1"
+  run run_validate
+  [ "$status" -eq 16 ]
+}
+
 @test "validate: thread_id non-integer exits 15" {
   export NF_BOT_TOKEN="t" NF_CHAT_ID="1" NF_STATUS="success" NF_MESSAGE_THREAD_ID="abc"
   run run_validate

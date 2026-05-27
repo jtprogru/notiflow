@@ -12,6 +12,7 @@ _NF_VALIDATE_LOADED=1
 #   13 INVALID_PARSE_MODE
 #   14 INVALID_NOTIFY_ON
 #   15 INVALID_THREAD_ID
+#   16 INVALID_EDIT_MESSAGE_ID
 
 _nf::_in_set() {
   # _nf::_in_set <value> <space-separated allowed values>
@@ -124,6 +125,26 @@ nf::validate() {
       nf::log error "INVALID_THREAD_ID: '$NF_MESSAGE_THREAD_ID'"
       exit 15
     fi
+  fi
+
+  # edit_message_id: optional. If set, must be either a positive integer or a
+  # CSV of positive integers whose length matches chat_id CSV length (so each
+  # chat is paired with exactly one message id to edit).
+  if [ -n "${NF_EDIT_MESSAGE_ID:-}" ]; then
+    local _nf_chats _nf_edits edit_raw edit_trimmed
+    IFS=',' read -ra _nf_chats <<<"$NF_CHAT_ID"
+    IFS=',' read -ra _nf_edits <<<"$NF_EDIT_MESSAGE_ID"
+    if [ "${#_nf_chats[@]}" -ne "${#_nf_edits[@]}" ]; then
+      nf::log error "INVALID_EDIT_MESSAGE_ID: count mismatch (chat_id=${#_nf_chats[@]} edit_message_id=${#_nf_edits[@]})"
+      exit 16
+    fi
+    for edit_raw in "${_nf_edits[@]}"; do
+      edit_trimmed=$(printf '%s' "$edit_raw" | sed -e 's/^ *//' -e 's/ *$//')
+      if ! printf '%s' "$edit_trimmed" | grep -Eq '^[0-9]+$'; then
+        nf::log error "INVALID_EDIT_MESSAGE_ID: '$edit_trimmed' is not a positive integer"
+        exit 16
+      fi
+    done
   fi
 
   return 0

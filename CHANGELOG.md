@@ -2,6 +2,19 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] — 2026-05-27
+
+### Added
+
+- New `edit_message_id` input. When set, the action calls `editMessageText` instead of `sendMessage`, so a workflow can update the same Telegram message across steps (start → progress → done) rather than spamming new ones.
+- Multi-chat edit: `edit_message_id` accepts a CSV whose length must match `chat_id`. Each `(chat_id[i], edit_message_id[i])` pair targets exactly one message. Wire `edit_message_id: ${{ steps.send.outputs.message_id }}` from a previous multi-chat send and the shapes line up automatically.
+- `disable_notification` and `message_thread_id` are silently dropped from the request body in edit mode — Telegram rejects them on `editMessageText`. `parse_mode` and `disable_web_page_preview` are kept (both accepted).
+- New exit code `16 INVALID_EDIT_MESSAGE_ID` for bad input (non-positive-integer item, CSV length mismatch).
+
+### Tests
+
+- `+10` cases: five validate (single + CSV happy paths, length mismatch, non-integer, negative integer) and five send (endpoint switches to `editMessageText`, edit JSON body shape, regression that send mode still excludes `message_id`, multi-chat pairing, edit failure surfaces error like send).
+
 ## [1.5.0] — 2026-05-27
 
 ### Added

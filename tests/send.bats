@@ -173,6 +173,67 @@ teardown() {
   last_mock_body | jq -e '.chat_id == 99' >/dev/null
 }
 
+@test "send: edit mode hits editMessageText endpoint" {
+  export NF_CHAT_ID="42" NF_EDIT_MESSAGE_ID="100"
+  mock_telegram_start "200:success"
+  run nf::send "updated text"
+  [ "$status" -eq 0 ]
+  assert_output_eq ok true
+  # The mock logs PATH for every request; verify the right endpoint was hit.
+  grep -q '/editMessageText' "$NF_MOCK_REQ_LOG"
+  ! grep -q '/sendMessage' "$NF_MOCK_REQ_LOG"
+}
+
+@test "send: edit JSON includes message_id, drops disable_notification & thread" {
+  export NF_CHAT_ID="42" NF_EDIT_MESSAGE_ID="100"
+  export NF_DISABLE_NOTIFICATION="true"
+  export NF_MESSAGE_THREAD_ID="7"
+  mock_telegram_start "200:success"
+  nf::send "updated"
+  local body
+  body=$(last_mock_body)
+  echo "$body" | jq -e '.message_id == 100' >/dev/null
+  echo "$body" | jq -e '.text == "updated"' >/dev/null
+  echo "$body" | jq -e '.parse_mode == "MarkdownV2"' >/dev/null
+  # Telegram rejects these on editMessageText; nf::send must omit them.
+  ! echo "$body" | jq -e 'has("disable_notification")' >/dev/null
+  ! echo "$body" | jq -e 'has("message_thread_id")' >/dev/null
+}
+
+@test "send: send mode JSON unchanged (regression — no message_id field leaks in)" {
+  export NF_CHAT_ID="42"
+  unset NF_EDIT_MESSAGE_ID
+  mock_telegram_start "200:success"
+  nf::send "fresh"
+  local body
+  body=$(last_mock_body)
+  echo "$body" | jq -e '.disable_notification == false' >/dev/null
+  ! echo "$body" | jq -e 'has("message_id")' >/dev/null
+}
+
+@test "send: multi-chat edit pairs each chat with its message_id" {
+  export NF_CHAT_ID="42,99"
+  export NF_EDIT_MESSAGE_ID="100,200"
+  mock_telegram_start "200:success,200:success_99"
+  run nf::send "updated"
+  [ "$status" -eq 0 ]
+  [ "$(count_mock_requests)" -eq 2 ]
+  assert_output_eq ok true
+  # Both requests should hit editMessageText.
+  [ "$(grep -c '/editMessageText' "$NF_MOCK_REQ_LOG")" -eq 2 ]
+  # Last body must be the second pair (chat 99, message 200).
+  last_mock_body | jq -e '.chat_id == 99 and .message_id == 200' >/dev/null
+}
+
+@test "send: edit failure surfaces error like send failure" {
+  export NF_CHAT_ID="42" NF_EDIT_MESSAGE_ID="100"
+  mock_telegram_start "400:bad_request"
+  run nf::send "stale"
+  [ "$status" -eq 1 ]
+  assert_output_eq ok false
+  assert_output_eq error "Bad Request: chat not found"
+}
+
 @test "send: single-chat preserves raw error format (no chat prefix)" {
   # Regression guard: single-chat error must NOT be prefixed with "chat N:".
   export NF_CHAT_ID="42"

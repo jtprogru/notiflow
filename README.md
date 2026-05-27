@@ -46,6 +46,7 @@ jobs:
 | `disable_notification` | no | `false` | Send silently. |
 | `message_thread_id` | no | _empty_ | Forum-chat thread (topic) ID. Integer. |
 | `fail_on_error` | no | `false` | If true, the action exits non-zero when Telegram delivery ultimately fails. |
+| `edit_message_id` | no | _empty_ | If set, edits the message via `editMessageText` instead of sending a fresh one. Integer for single-chat, or a CSV whose length must match `chat_id` for multi-chat (paired by index). `disable_notification` and `message_thread_id` are silently dropped when editing — Telegram rejects them on edit. |
 
 ## Outputs
 
@@ -130,6 +131,31 @@ Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<
     status:    ${{ needs.build.result }}
     notify_on: 'failure,cancelled'
 ```
+
+### Edit a previous message (dedupe progress updates)
+
+```yaml
+- id: notify_start
+  uses: jtprogru/notiflow@v1
+  with:
+    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
+    status:    success
+    message:   '⏳ Build started'
+
+- run: ./long-running-build.sh
+
+- if: always()
+  uses: jtprogru/notiflow@v1
+  with:
+    bot_token:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    chat_id:         ${{ secrets.TELEGRAM_CHAT_ID }}
+    status:          ${{ job.status }}
+    edit_message_id: ${{ steps.notify_start.outputs.message_id }}
+    message:         '✅ Build done'
+```
+
+For multi-chat edits, wire the CSV `message_id` from the previous step into `edit_message_id` directly — same index pairing in, same shape out.
 
 ### Fan-out to multiple chats
 

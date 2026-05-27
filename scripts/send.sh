@@ -8,14 +8,19 @@ _NF_SEND_LOADED=1
 _NF_MAX_ATTEMPTS=4
 # Exponential backoff base: attempt 1 → 1s, attempt 2 → 2s, attempt 3 → 4s.
 
-# _nf::_build_json <chat_id> <text>
-# Constructs the JSON request body for sendMessage. Uses jq so we don't have to
-# worry about quoting. Output is a single-line JSON object.
+# _nf::_build_json <chat_id> <text> [edit_message_id]
+# Constructs the JSON request body for sendMessage or editMessageText. Uses jq
+# so we don't have to worry about quoting. Output is a single-line JSON object.
+# When edit_message_id is provided:
+#   - adds message_id field
+#   - drops disable_notification and message_thread_id (Telegram rejects them
+#     on editMessageText)
 _nf::_build_json() {
   local chat_id="$1"
   local text="$2"
+  local edit_message_id="${3:-}"
   local thread_arg=""
-  local dwpp dnotif
+  local dwpp dnotif edit_flag=0
 
   case "${NF_DISABLE_WEB_PAGE_PREVIEW:-true}" in
     true) dwpp=true ;;
@@ -32,6 +37,10 @@ _nf::_build_json() {
     thread_arg=1
   fi
 
+  if [ -n "$edit_message_id" ]; then
+    edit_flag=1
+  fi
+
   local pm="${NF_PARSE_MODE:-MarkdownV2}"
 
   jq -n \
@@ -42,15 +51,22 @@ _nf::_build_json() {
     --argjson dnotif "$dnotif" \
     --arg thread_id "${NF_MESSAGE_THREAD_ID:-}" \
     --argjson include_thread "${thread_arg:-0}" \
+    --arg edit_message_id "$edit_message_id" \
+    --argjson edit_flag "$edit_flag" \
     '
     ({
        chat_id: ( ($chat_id | tonumber?) // $chat_id ),
        text: $text,
-       disable_web_page_preview: $dwpp,
-       disable_notification: $dnotif
+       disable_web_page_preview: $dwpp
      }
      + (if $parse_mode == "none" or $parse_mode == "" then {} else {parse_mode: $parse_mode} end)
-     + (if $include_thread == 1 then {message_thread_id: ($thread_id | tonumber)} else {} end))
+     + (if $edit_flag == 1
+        # edit mode: include message_id, drop disable_notification and thread
+        then {message_id: ($edit_message_id | tonumber)}
+        # send mode: include disable_notification and optional thread
+        else {disable_notification: $dnotif}
+             + (if $include_thread == 1 then {message_thread_id: ($thread_id | tonumber)} else {} end)
+        end))
     '
 }
 
@@ -75,18 +91,20 @@ _nf::_resolve_api_base() {
   printf 'https://api.telegram.org'
 }
 
-# _nf::_post <json>
-# Performs one HTTP POST. Prints "<http_code>\n<body>".
-# Timeouts are bounded so a hung peer cannot stall the workflow:
+# _nf::_post <json> [endpoint]
+# Performs one HTTP POST. Prints "<http_code>\n<body>". Default endpoint is
+# sendMessage; pass editMessageText to edit instead. Timeouts are bounded so
+# a hung peer cannot stall the workflow:
 #   NF_CONNECT_TIMEOUT — TCP/TLS handshake budget (seconds, default 5)
 #   NF_MAX_TIME        — whole-request budget (seconds, default 15)
 # Exceeding either causes curl to exit non-zero; the caller treats this as a
 # network error and applies the same backoff/retry path as a 5xx.
 _nf::_post() {
   local json="$1"
+  local endpoint="${2:-sendMessage}"
   local base
   base=$(_nf::_resolve_api_base "${NF_API_BASE:-https://api.telegram.org}")
-  local url="${base}/bot${NF_BOT_TOKEN}/sendMessage"
+  local url="${base}/bot${NF_BOT_TOKEN}/${endpoint}"
   local connect_timeout="${NF_CONNECT_TIMEOUT:-5}"
   local max_time="${NF_MAX_TIME:-15}"
   curl -sS -o - -w '\n%{http_code}' \
@@ -98,19 +116,23 @@ _nf::_post() {
     "$url" <<<"$json"
 }
 
-# _nf::_send_one <chat_id> <text>
+# _nf::_send_one <chat_id> <text> [edit_message_id]
 # Per-chat retry loop. Returns 0 on success, 1 on terminal failure. Writes
 # per-chat results into globals consumed by nf::send:
 #   _NF_RESULT_MID         — Telegram message_id on success, empty on failure
 #   _NF_RESULT_HTTP_STATUS — last HTTP status code observed for this chat
 #   _NF_RESULT_ERROR       — empty on success, populated on failure
-# Globals (rather than parsed stdout) keep the retry/jq output of the loop
-# from being captured into a variable by the caller.
+# When edit_message_id is set, the call targets editMessageText instead of
+# sendMessage. Globals (rather than parsed stdout) keep the retry/jq output
+# of the loop from being captured into a variable by the caller.
 _nf::_send_one() {
   local chat_id="$1"
   local text="$2"
+  local edit_message_id="${3:-}"
+  local endpoint="sendMessage"
+  [ -n "$edit_message_id" ] && endpoint="editMessageText"
   local json
-  json=$(_nf::_build_json "$chat_id" "$text")
+  json=$(_nf::_build_json "$chat_id" "$text" "$edit_message_id")
 
   local attempt=1
   local http_status=0
@@ -120,7 +142,7 @@ _nf::_send_one() {
 
   while [ "$attempt" -le "$_NF_MAX_ATTEMPTS" ]; do
     local curl_exit
-    raw=$(_nf::_post "$json") || curl_exit=$?
+    raw=$(_nf::_post "$json" "$endpoint") || curl_exit=$?
     curl_exit=${curl_exit:-0}
 
     if [ "$curl_exit" -ne 0 ]; then
@@ -228,29 +250,35 @@ _nf::_send_one() {
 nf::send() {
   local text="$1"
 
-  # validate.sh already ensured every CSV item is a well-formed chat_id.
-  local saved_ifs="$IFS"
-  IFS=','
-  # shellcheck disable=SC2086  # word-splitting on commas is intentional
-  set -- $NF_CHAT_ID
-  IFS="$saved_ifs"
+  # validate.sh already ensured every CSV item is well-formed and, if
+  # NF_EDIT_MESSAGE_ID is set, that its CSV has the same length as chat_id.
+  local chats edits=()
+  IFS=',' read -ra chats <<<"$NF_CHAT_ID"
+  if [ -n "${NF_EDIT_MESSAGE_ID:-}" ]; then
+    IFS=',' read -ra edits <<<"$NF_EDIT_MESSAGE_ID"
+  fi
 
-  local chat_count=$#
+  local chat_count=${#chats[@]}
   local all_ok=1
   local mids=""
   local errors=""
   local first_failure_status=""
   local first=1
-  local chat trimmed
+  local i trimmed_chat trimmed_edit
 
-  for chat in "$@"; do
-    trimmed=$(printf '%s' "$chat" | sed -e 's/^ *//' -e 's/ *$//')
+  for i in "${!chats[@]}"; do
+    trimmed_chat=$(printf '%s' "${chats[$i]}" | sed -e 's/^ *//' -e 's/ *$//')
+    if [ "${#edits[@]}" -gt 0 ]; then
+      trimmed_edit=$(printf '%s' "${edits[$i]}" | sed -e 's/^ *//' -e 's/ *$//')
+    else
+      trimmed_edit=""
+    fi
     if [ "$first" -eq 1 ]; then
       first=0
     else
       mids="${mids},"
     fi
-    if _nf::_send_one "$trimmed" "$text"; then
+    if _nf::_send_one "$trimmed_chat" "$text" "$trimmed_edit"; then
       mids="${mids}${_NF_RESULT_MID}"
     else
       all_ok=0
@@ -258,7 +286,7 @@ nf::send() {
       # Single-chat keeps the raw error format; multi-chat prefixes with the
       # chat id so users can tell which destination failed.
       if [ "$chat_count" -gt 1 ]; then
-        errors="${errors:+${errors}; }chat ${trimmed}: ${_NF_RESULT_ERROR}"
+        errors="${errors:+${errors}; }chat ${trimmed_chat}: ${_NF_RESULT_ERROR}"
       else
         errors="${_NF_RESULT_ERROR}"
       fi
