@@ -25,6 +25,26 @@ FIXTURES = {
             "parameters": {"retry_after": 1},
         },
     ),
+    # Pathological retry_after value used to exercise the NF_MAX_RETRY_AFTER cap.
+    "rate_limit_huge": (
+        429,
+        {
+            "ok": False,
+            "error_code": 429,
+            "description": "Too Many Requests: retry after 9999",
+            "parameters": {"retry_after": 9999},
+        },
+    ),
+    # Non-integer retry_after used to verify safe fallback to 1s.
+    "rate_limit_garbage": (
+        429,
+        {
+            "ok": False,
+            "error_code": 429,
+            "description": "Too Many Requests: retry after soon",
+            "parameters": {"retry_after": "soon"},
+        },
+    ),
     "server_error": (500, {"ok": False, "error_code": 500, "description": "internal"}),
     "bad_request": (
         400,

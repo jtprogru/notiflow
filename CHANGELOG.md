@@ -2,6 +2,15 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-05-27
+
+### Added
+
+- `scripts/send.sh`: the `429` retry path now caps `parameters.retry_after` at `NF_MAX_RETRY_AFTER` (default 60s). Telegram occasionally returns pathological values (hundreds or thousands of seconds); without a cap a single rate-limited request could stall the workflow for an hour. Override via `NF_MAX_RETRY_AFTER` env var (env-only, same pattern as `NF_CONNECT_TIMEOUT` / `NF_MAX_TIME`).
+- `scripts/send.sh`: `retry_after` is validated as a non-negative integer; any other shape (string, float, missing) falls back to 1s instead of crashing `sleep`.
+- `tests/send.bats`: three new cases covering the cap with a stubbed `sleep` to assert the exact value, a non-integer fallback, and an env-overridden cap.
+- `tests/fixtures/mock_server.py`: two new fixtures, `rate_limit_huge` (retry_after=9999) and `rate_limit_garbage` (retry_after="soon").
+
 ## [1.1.0] — 2026-05-27
 
 ### Added

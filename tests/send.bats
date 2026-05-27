@@ -184,6 +184,48 @@ EOF
   awk 'p {print; exit} /^--max-time$/ {p=1}' "$argv_log" | grep -Fxq '15'
 }
 
+@test "send: 429 huge retry_after is capped by NF_MAX_RETRY_AFTER" {
+  export NF_MAX_RETRY_AFTER=1
+  mock_telegram_start "429:rate_limit_huge,200:success"
+  local start end
+  start=$(date +%s)
+  run nf::send "hi"
+  end=$(date +%s)
+  [ "$status" -eq 0 ]
+  [ "$(count_mock_requests)" -eq 2 ]
+  # Without the cap the test would sleep 9999s. Cap=1 → total < 10s.
+  [ $((end - start)) -lt 10 ]
+}
+
+@test "send: 429 non-integer retry_after falls back to 1s" {
+  mock_telegram_start "429:rate_limit_garbage,200:success"
+  local start end
+  start=$(date +%s)
+  run nf::send "hi"
+  end=$(date +%s)
+  [ "$status" -eq 0 ]
+  [ "$(count_mock_requests)" -eq 2 ]
+  # Fallback is 1s; total should land in [1, 10).
+  [ $((end - start)) -ge 1 ]
+  [ $((end - start)) -lt 10 ]
+}
+
+@test "send: 429 cap default is 60s when NF_MAX_RETRY_AFTER unset" {
+  # Stub sleep to capture its argument without actually waiting.
+  local stub_dir="${BATS_TEST_TMPDIR}/stub"
+  local sleep_log="${BATS_TEST_TMPDIR}/sleep.arg"
+  mkdir -p "$stub_dir"
+  cat >"${stub_dir}/sleep" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$1" >>"${sleep_log}"
+EOF
+  chmod +x "${stub_dir}/sleep"
+  mock_telegram_start "429:rate_limit_huge,200:success"
+  PATH="${stub_dir}:${PATH}" nf::send "hi"
+  # First (and only) sleep should be the capped value, 60.
+  [ "$(head -n1 "$sleep_log")" = "60" ]
+}
+
 @test "send: NF_CONNECT_TIMEOUT and NF_MAX_TIME override defaults" {
   export NF_CONNECT_TIMEOUT=3
   export NF_MAX_TIME=7

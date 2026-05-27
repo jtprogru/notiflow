@@ -118,8 +118,21 @@ nf::send() {
         nf::log warn "Telegram returned 200 but ok=false attempt=$attempt"
         ;;
       429)
-        local retry_after
-        retry_after=$(printf '%s' "$body" | jq -r '.parameters.retry_after // 1' 2>/dev/null || echo 1)
+        # Telegram occasionally returns pathological retry_after values
+        # (hundreds or thousands of seconds). Without a cap a single
+        # rate-limited request could stall the workflow for an hour.
+        # Validate the value, then bound it by NF_MAX_RETRY_AFTER (default 60).
+        local retry_after_raw retry_after cap
+        retry_after_raw=$(printf '%s' "$body" | jq -r '.parameters.retry_after // 1' 2>/dev/null)
+        case "${retry_after_raw:-}" in
+          '' | *[!0-9]*) retry_after=1 ;;
+          *) retry_after="$retry_after_raw" ;;
+        esac
+        cap="${NF_MAX_RETRY_AFTER:-60}"
+        if [ "$retry_after" -gt "$cap" ]; then
+          nf::log warn "429 retry_after=${retry_after}s capped at ${cap}s"
+          retry_after="$cap"
+        fi
         if [ "$attempt" -lt "$_NF_MAX_ATTEMPTS" ]; then
           nf::log warn "429 rate-limited; sleeping ${retry_after}s (attempt=$attempt)"
           sleep "$retry_after"
