@@ -29,28 +29,42 @@ nf::validate() {
     exit 10
   fi
 
-  # chat_id: integer (with optional leading minus) OR @username (4..32 of [A-Za-z0-9_]).
-  case "$NF_CHAT_ID" in
-    @*)
-      local uname="${NF_CHAT_ID#@}"
-      if ! printf '%s' "$uname" | grep -Eq '^[A-Za-z0-9_]{4,32}$'; then
-        nf::log error "INVALID_CHAT_ID: '$NF_CHAT_ID'"
-        exit 11
-      fi
-      ;;
-    -*)
-      if ! printf '%s' "${NF_CHAT_ID#-}" | grep -Eq '^[0-9]+$'; then
-        nf::log error "INVALID_CHAT_ID: '$NF_CHAT_ID'"
-        exit 11
-      fi
-      ;;
-    *)
-      if ! printf '%s' "$NF_CHAT_ID" | grep -Eq '^[0-9]+$'; then
-        nf::log error "INVALID_CHAT_ID: '$NF_CHAT_ID'"
-        exit 11
-      fi
-      ;;
-  esac
+  # chat_id: one chat or comma-separated list. Each item is an integer (with
+  # optional leading minus) OR @username (4..32 of [A-Za-z0-9_]).
+  local saved_ifs="$IFS"
+  IFS=','
+  # shellcheck disable=SC2086  # word-splitting on commas is intentional
+  set -- $NF_CHAT_ID
+  IFS="$saved_ifs"
+  local raw trimmed uname
+  for raw in "$@"; do
+    trimmed=$(printf '%s' "$raw" | sed -e 's/^ *//' -e 's/ *$//')
+    if [ -z "$trimmed" ]; then
+      nf::log error "INVALID_CHAT_ID: empty item in '$NF_CHAT_ID'"
+      exit 11
+    fi
+    case "$trimmed" in
+      @*)
+        uname="${trimmed#@}"
+        if ! printf '%s' "$uname" | grep -Eq '^[A-Za-z0-9_]{4,32}$'; then
+          nf::log error "INVALID_CHAT_ID: '$trimmed'"
+          exit 11
+        fi
+        ;;
+      -*)
+        if ! printf '%s' "${trimmed#-}" | grep -Eq '^[0-9]+$'; then
+          nf::log error "INVALID_CHAT_ID: '$trimmed'"
+          exit 11
+        fi
+        ;;
+      *)
+        if ! printf '%s' "$trimmed" | grep -Eq '^[0-9]+$'; then
+          nf::log error "INVALID_CHAT_ID: '$trimmed'"
+          exit 11
+        fi
+        ;;
+    esac
+  done
 
   # status: must be one of the allowed values. Caller passes it from the workflow
   # (typically ${{ job.status }} or ${{ needs.<job>.result }}) — composite action

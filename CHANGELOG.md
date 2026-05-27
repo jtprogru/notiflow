@@ -2,6 +2,22 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] — 2026-05-27
+
+### Added
+
+- `chat_id` now accepts a comma-separated list of destinations and fans the message out to each. Sequential execution; each chat gets its own retry chain (timeouts, 429 cap, 5xx backoff — same policy as before, applied independently per chat). Whitespace around CSV items is tolerated; validation runs per item with the existing rules (integer, negative integer, or `@username`).
+- Aggregated outputs for multi-chat:
+  - `ok=true` only if **every** chat succeeded.
+  - `message_id` is a CSV of message ids in input order; failed chats leave an empty slot (e.g. `42,,103`).
+  - `http_status` reports the first non-200 status seen (or 200 if all succeeded).
+  - `error` enumerates failed chats as `chat <id>: <reason>` joined with `; `.
+- Single-chat behavior is preserved bit-for-bit: `message_id="42"`, raw `error` (no `chat 42:` prefix), `http_status=<code>` exactly as before. Existing workflows do not need changes.
+
+### Tests
+
+- `+9` cases: four for CSV validation (valid mix, invalid item, empty item, whitespace) and five for send (all-success multi-chat, partial failure with empty slot, per-chat retry chains, per-chat JSON body, and a regression guard ensuring single-chat error stays unprefixed).
+
 ## [1.4.0] — 2026-05-27
 
 ### Added

@@ -8,11 +8,12 @@ _NF_SEND_LOADED=1
 _NF_MAX_ATTEMPTS=4
 # Exponential backoff base: attempt 1 → 1s, attempt 2 → 2s, attempt 3 → 4s.
 
-# _nf::_build_json <text>
+# _nf::_build_json <chat_id> <text>
 # Constructs the JSON request body for sendMessage. Uses jq so we don't have to
 # worry about quoting. Output is a single-line JSON object.
 _nf::_build_json() {
-  local text="$1"
+  local chat_id="$1"
+  local text="$2"
   local thread_arg=""
   local dwpp dnotif
 
@@ -34,7 +35,7 @@ _nf::_build_json() {
   local pm="${NF_PARSE_MODE:-MarkdownV2}"
 
   jq -n \
-    --arg chat_id "$NF_CHAT_ID" \
+    --arg chat_id "$chat_id" \
     --arg text "$text" \
     --arg parse_mode "$pm" \
     --argjson dwpp "$dwpp" \
@@ -97,21 +98,24 @@ _nf::_post() {
     "$url" <<<"$json"
 }
 
-# nf::send <text>
-# Sends the message. Sets outputs ok/message_id/http_status. Returns 0 on
-# success, 1 on failure. The caller (entrypoint) maps return code to exit
-# code based on fail_on_error.
-nf::send() {
-  local text="$1"
+# _nf::_send_one <chat_id> <text>
+# Per-chat retry loop. Returns 0 on success, 1 on terminal failure. Writes
+# per-chat results into globals consumed by nf::send:
+#   _NF_RESULT_MID         — Telegram message_id on success, empty on failure
+#   _NF_RESULT_HTTP_STATUS — last HTTP status code observed for this chat
+#   _NF_RESULT_ERROR       — empty on success, populated on failure
+# Globals (rather than parsed stdout) keep the retry/jq output of the loop
+# from being captured into a variable by the caller.
+_nf::_send_one() {
+  local chat_id="$1"
+  local text="$2"
   local json
-  json=$(_nf::_build_json "$text")
+  json=$(_nf::_build_json "$chat_id" "$text")
 
   local attempt=1
   local http_status=0
   local body=""
   local raw
-  # last_error tracks the most recent failure reason across retries. It is
-  # surfaced via the `error` output on terminal failure; empty on success.
   local last_error=""
 
   while [ "$attempt" -le "$_NF_MAX_ATTEMPTS" ]; do
@@ -120,12 +124,11 @@ nf::send() {
     curl_exit=${curl_exit:-0}
 
     if [ "$curl_exit" -ne 0 ]; then
-      nf::log warn "curl failed (exit=$curl_exit) attempt=$attempt"
+      nf::log warn "curl failed (exit=$curl_exit) chat=$chat_id attempt=$attempt"
       http_status=0
       body=""
       last_error="network error (curl exit $curl_exit)"
     else
-      # Last line of $raw is the http code; everything before is the body.
       http_status=$(printf '%s' "$raw" | tail -n1)
       body=$(printf '%s' "$raw" | sed '$d')
     fi
@@ -134,22 +137,15 @@ nf::send() {
     case "$http_status" in
       200)
         if printf '%s' "$body" | jq -e '.ok == true' >/dev/null 2>&1; then
-          local mid
-          mid=$(printf '%s' "$body" | jq -r '.result.message_id')
-          nf::set_output ok true
-          nf::set_output message_id "$mid"
-          nf::set_output http_status 200
-          nf::set_output error ""
+          _NF_RESULT_MID=$(printf '%s' "$body" | jq -r '.result.message_id')
+          _NF_RESULT_HTTP_STATUS=200
+          _NF_RESULT_ERROR=""
           return 0
         fi
         last_error=$(printf '%s' "$body" | jq -r '.description // "200 ok=false"' 2>/dev/null)
-        nf::log warn "Telegram returned 200 but ok=false attempt=$attempt"
+        nf::log warn "Telegram returned 200 but ok=false chat=$chat_id attempt=$attempt"
         ;;
       429)
-        # Telegram occasionally returns pathological retry_after values
-        # (hundreds or thousands of seconds). Without a cap a single
-        # rate-limited request could stall the workflow for an hour.
-        # Validate the value, then bound it by NF_MAX_RETRY_AFTER (default 60).
         local retry_after_raw retry_after cap
         retry_after_raw=$(printf '%s' "$body" | jq -r '.parameters.retry_after // 1' 2>/dev/null)
         case "${retry_after_raw:-}" in
@@ -158,12 +154,12 @@ nf::send() {
         esac
         cap="${NF_MAX_RETRY_AFTER:-60}"
         if [ "$retry_after" -gt "$cap" ]; then
-          nf::log warn "429 retry_after=${retry_after}s capped at ${cap}s"
+          nf::log warn "429 retry_after=${retry_after}s capped at ${cap}s (chat=$chat_id)"
           retry_after="$cap"
         fi
         last_error=$(printf '%s' "$body" | jq -r '.description // "rate limited"' 2>/dev/null)
         if [ "$attempt" -lt "$_NF_MAX_ATTEMPTS" ]; then
-          nf::log warn "429 rate-limited; sleeping ${retry_after}s (attempt=$attempt)"
+          nf::log warn "429 rate-limited; sleeping ${retry_after}s chat=$chat_id attempt=$attempt"
           sleep "$retry_after"
         fi
         ;;
@@ -177,15 +173,14 @@ nf::send() {
         fi
         if [ "$attempt" -lt "$_NF_MAX_ATTEMPTS" ]; then
           local delay=$((1 << (attempt - 1)))
-          nf::log warn "5xx ($http_status); backoff ${delay}s (attempt=$attempt)"
+          nf::log warn "5xx ($http_status); backoff ${delay}s chat=$chat_id attempt=$attempt"
           sleep "$delay"
         fi
         ;;
       0)
-        # network error — backoff like 5xx (last_error already set above)
         if [ "$attempt" -lt "$_NF_MAX_ATTEMPTS" ]; then
           local delay=$((1 << (attempt - 1)))
-          nf::log warn "network error; backoff ${delay}s (attempt=$attempt)"
+          nf::log warn "network error; backoff ${delay}s chat=$chat_id attempt=$attempt"
           sleep "$delay"
         fi
         ;;
@@ -197,26 +192,91 @@ nf::send() {
         else
           last_error="HTTP $http_status"
         fi
-        nf::log error "Telegram returned $http_status (no retry): $last_error"
-        nf::set_output ok false
-        nf::set_output message_id ""
-        nf::set_output http_status "$http_status"
-        nf::set_output error "$last_error"
+        nf::log error "Telegram returned $http_status (no retry) chat=$chat_id: $last_error"
+        _NF_RESULT_MID=""
+        _NF_RESULT_HTTP_STATUS="$http_status"
+        _NF_RESULT_ERROR="$last_error"
         return 1
         ;;
       *)
         last_error="HTTP $http_status (unexpected)"
-        nf::log warn "unexpected http_status=$http_status attempt=$attempt"
+        nf::log warn "unexpected http_status=$http_status chat=$chat_id attempt=$attempt"
         ;;
     esac
 
     attempt=$((attempt + 1))
   done
 
-  nf::log warn "send failed after $_NF_MAX_ATTEMPTS attempts (last http_status=$http_status)"
+  nf::log warn "send failed after $_NF_MAX_ATTEMPTS attempts chat=$chat_id (last http_status=$http_status)"
+  _NF_RESULT_MID=""
+  _NF_RESULT_HTTP_STATUS="$http_status"
+  _NF_RESULT_ERROR="${last_error:-send failed}"
+  return 1
+}
+
+# nf::send <text>
+# Sends <text> to each chat in NF_CHAT_ID (single value or CSV) sequentially.
+# Aggregates per-chat results into outputs:
+#   ok          — true only if every chat succeeded
+#   message_id  — CSV of message_ids in input order; empty slot for failed
+#                 chats (e.g. "42,,103")
+#   http_status — 200 if all succeeded, else the first non-200 status seen
+#   error       — empty on success; on failure, "chat <id>: <reason>" joined
+#                 with "; " for every failed chat
+# Returns 0 only if every chat succeeded; 1 on any failure. The caller
+# (entrypoint) maps return code to exit code based on fail_on_error.
+nf::send() {
+  local text="$1"
+
+  # validate.sh already ensured every CSV item is a well-formed chat_id.
+  local saved_ifs="$IFS"
+  IFS=','
+  # shellcheck disable=SC2086  # word-splitting on commas is intentional
+  set -- $NF_CHAT_ID
+  IFS="$saved_ifs"
+
+  local chat_count=$#
+  local all_ok=1
+  local mids=""
+  local errors=""
+  local first_failure_status=""
+  local first=1
+  local chat trimmed
+
+  for chat in "$@"; do
+    trimmed=$(printf '%s' "$chat" | sed -e 's/^ *//' -e 's/ *$//')
+    if [ "$first" -eq 1 ]; then
+      first=0
+    else
+      mids="${mids},"
+    fi
+    if _nf::_send_one "$trimmed" "$text"; then
+      mids="${mids}${_NF_RESULT_MID}"
+    else
+      all_ok=0
+      # mids gets an empty slot (the separator already appended above).
+      # Single-chat keeps the raw error format; multi-chat prefixes with the
+      # chat id so users can tell which destination failed.
+      if [ "$chat_count" -gt 1 ]; then
+        errors="${errors:+${errors}; }chat ${trimmed}: ${_NF_RESULT_ERROR}"
+      else
+        errors="${_NF_RESULT_ERROR}"
+      fi
+      [ -z "$first_failure_status" ] && first_failure_status="$_NF_RESULT_HTTP_STATUS"
+    fi
+  done
+
+  if [ "$all_ok" -eq 1 ]; then
+    nf::set_output ok true
+    nf::set_output message_id "$mids"
+    nf::set_output http_status 200
+    nf::set_output error ""
+    return 0
+  fi
+
   nf::set_output ok false
-  nf::set_output message_id ""
-  nf::set_output http_status "$http_status"
-  nf::set_output error "${last_error:-send failed}"
+  nf::set_output message_id "$mids"
+  nf::set_output http_status "$first_failure_status"
+  nf::set_output error "$errors"
   return 1
 }

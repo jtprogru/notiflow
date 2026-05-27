@@ -32,7 +32,7 @@ jobs:
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
 | `bot_token` | yes | — | Telegram bot token (store as a secret). |
-| `chat_id` | yes | — | Target chat ID (integer, possibly negative) or `@channel_username`. |
+| `chat_id` | yes | — | Target chat ID (integer, possibly negative) or `@channel_username`. Accepts a comma-separated list to fan out to multiple chats; each item is validated independently. Whitespace around items is tolerated. |
 | `status` | yes | — | Job status. Must be passed explicitly (typically `${{ job.status }}` or `${{ needs.<job>.result }}`). Allowed: `success`, `failure`, `cancelled`, `skipped`. |
 | `parse_mode` | no | `MarkdownV2` | `MarkdownV2`, `HTML`, `Markdown`, or `none`. |
 | `notify_on` | no | `success,failure,cancelled` | Comma-separated statuses that trigger a notification. Accepts `any` or `all` as a shortcut for all four statuses. |
@@ -51,10 +51,10 @@ jobs:
 
 | Name | Description |
 |------|-------------|
-| `ok` | `true` if the message was delivered, `false` otherwise. |
-| `message_id` | Telegram `message_id` on success. Empty on failure. |
-| `http_status` | Last HTTP status code observed. `0` for skip / network error. |
-| `error` | Error reason on failure — Telegram's `.description` when available, otherwise `HTTP <code>` / `network error (curl exit N)`. Empty on success and on skip. |
+| `ok` | `true` if the message was delivered to **every** chat in `chat_id`, `false` otherwise. |
+| `message_id` | Telegram `message_id` on single-chat success. For CSV `chat_id`, a CSV of message_ids in input order with an empty slot for any failed chat (e.g. `42,,103`). Empty entirely on single-chat failure or skip. |
+| `http_status` | Last HTTP status code observed. `200` if all chats succeeded; otherwise the first non-200 status seen. `0` for skip / network error. |
+| `error` | Error reason on failure — Telegram's `.description` when available, otherwise `HTTP <code>` / `network error (curl exit N)`. Single-chat: raw reason. Multi-chat: each failed chat formatted as `chat <id>: <reason>`, joined with `; `. Empty on success and on skip. |
 
 ## Template priority
 
@@ -130,6 +130,18 @@ Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<
     status:    ${{ needs.build.result }}
     notify_on: 'failure,cancelled'
 ```
+
+### Fan-out to multiple chats
+
+```yaml
+- uses: jtprogru/notiflow@v1
+  with:
+    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    chat_id:   '${{ secrets.TELEGRAM_CHAT_ID }},@release_channel,-1001234567890'
+    status:    ${{ job.status }}
+```
+
+`message_id` becomes a CSV in input order (e.g. `42,99,103`). On partial failure the failed slot is empty (`42,,103`) and `error` enumerates the failed chats (`chat @release_channel: Forbidden; chat -1001234567890: chat not found`). `ok=false` and `http_status` reports the first non-200 status.
 
 ### Forum chat thread
 

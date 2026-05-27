@@ -51,6 +51,31 @@ run_validate() {
   [ "$status" -eq 0 ]
 }
 
+@test "validate: chat_id CSV of valid items accepted" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42,-100500,@channel_one" NF_STATUS="success" NF_PARSE_MODE="none"
+  run run_validate
+  [ "$status" -eq 0 ]
+}
+
+@test "validate: chat_id CSV with one invalid item exits 11" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42,notanumber,99" NF_STATUS="success" NF_PARSE_MODE="none"
+  run run_validate
+  [ "$status" -eq 11 ]
+  [[ "$output" == *"INVALID_CHAT_ID: 'notanumber'"* ]]
+}
+
+@test "validate: chat_id CSV with empty item exits 11" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42,,99" NF_STATUS="success" NF_PARSE_MODE="none"
+  run run_validate
+  [ "$status" -eq 11 ]
+}
+
+@test "validate: chat_id CSV tolerates whitespace around items" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="42, 99 , -100" NF_STATUS="success" NF_PARSE_MODE="none"
+  run run_validate
+  [ "$status" -eq 0 ]
+}
+
 @test "validate: chat_id 'abc' rejected with exit 11" {
   export NF_BOT_TOKEN="t" NF_CHAT_ID="abc" NF_STATUS="success"
   run run_validate

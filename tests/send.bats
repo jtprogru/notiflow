@@ -125,6 +125,63 @@ teardown() {
   [ "$(count_mock_requests)" -eq 1 ]
 }
 
+@test "send: multi-chat all success → ok=true, message_id CSV in order" {
+  export NF_CHAT_ID="42,99"
+  mock_telegram_start "200:success,200:success_99"
+  run nf::send "hi"
+  [ "$status" -eq 0 ]
+  [ "$(count_mock_requests)" -eq 2 ]
+  assert_output_eq ok true
+  assert_output_eq message_id "42,99"
+  assert_output_eq http_status 200
+  assert_output_eq error ""
+}
+
+@test "send: multi-chat partial failure → ok=false, empty slot for failed, error prefixed by chat" {
+  export NF_CHAT_ID="42,99,103"
+  # Middle chat 4xx → no retry; other two succeed.
+  mock_telegram_start "200:success,400:bad_request,200:success_99"
+  run nf::send "hi"
+  [ "$status" -eq 1 ]
+  [ "$(count_mock_requests)" -eq 3 ]
+  assert_output_eq ok false
+  assert_output_eq message_id "42,,99"
+  # http_status reports the first non-200 seen
+  assert_output_eq http_status 400
+  # error mentions the failing chat by id
+  local err
+  err=$(read_output error)
+  [[ "$err" == *"chat 99: Bad Request: chat not found"* ]]
+}
+
+@test "send: multi-chat each chat gets its own retry chain" {
+  export NF_CHAT_ID="42,99"
+  # First chat: 500,500,200 → 3 requests; second chat: 200 → 1 request. Total 4.
+  mock_telegram_start "500:server_error,500:server_error,200:success,200:success_99"
+  run nf::send "hi"
+  [ "$status" -eq 0 ]
+  [ "$(count_mock_requests)" -eq 4 ]
+  assert_output_eq ok true
+  assert_output_eq message_id "42,99"
+}
+
+@test "send: multi-chat JSON body carries the per-chat chat_id" {
+  export NF_CHAT_ID="42,99"
+  mock_telegram_start "200:success,200:success_99"
+  nf::send "hi"
+  # last_mock_body shows the LAST request — must be the second chat
+  last_mock_body | jq -e '.chat_id == 99' >/dev/null
+}
+
+@test "send: single-chat preserves raw error format (no chat prefix)" {
+  # Regression guard: single-chat error must NOT be prefixed with "chat N:".
+  export NF_CHAT_ID="42"
+  mock_telegram_start "400:bad_request"
+  run nf::send "hi"
+  [ "$status" -eq 1 ]
+  assert_output_eq error "Bad Request: chat not found"
+}
+
 @test "send: 200 success clears error output" {
   mock_telegram_start "200:success"
   run nf::send "hi"
