@@ -1,0 +1,102 @@
+name: 'notiflow — Telegram CI Notifier'
+description: 'Send a Telegram message when a workflow job completes. Customizable message format, retry on rate limits.'
+author: 'jtprogru'
+
+branding:
+  icon: 'send'
+  color: 'blue'
+
+inputs:
+  bot_token:
+    description: 'Telegram bot token (use a repository secret).'
+    required: true
+  chat_id:
+    description: 'Target chat ID (integer, possibly negative) or @channel_username.'
+    required: true
+  status:
+    description: 'Job status to report. Defaults to ${{ job.status }}.'
+    required: false
+    default: ${{ job.status }}
+  parse_mode:
+    description: 'Telegram parse_mode: MarkdownV2 (default), HTML, Markdown, or none.'
+    required: false
+    default: 'MarkdownV2'
+  notify_on:
+    description: 'Comma-separated list of statuses that should trigger a notification.'
+    required: false
+    default: 'success,failure,cancelled'
+  message:
+    description: 'Verbatim message text. Overrides every template. No placeholder substitution applied.'
+    required: false
+    default: ''
+  message_template:
+    description: 'Template string with {{.Field}} placeholders, used for all statuses not overridden by template_<status>.'
+    required: false
+    default: ''
+  template_success:
+    description: 'Template used when status=success. Overrides message_template.'
+    required: false
+    default: ''
+  template_failure:
+    description: 'Template used when status=failure. Overrides message_template.'
+    required: false
+    default: ''
+  template_cancelled:
+    description: 'Template used when status=cancelled. Overrides message_template.'
+    required: false
+    default: ''
+  template_skipped:
+    description: 'Template used when status=skipped. Overrides message_template.'
+    required: false
+    default: ''
+  disable_web_page_preview:
+    description: 'Suppress link previews in the Telegram message.'
+    required: false
+    default: 'true'
+  disable_notification:
+    description: 'Send the message silently (no sound for recipients).'
+    required: false
+    default: 'false'
+  message_thread_id:
+    description: 'Forum-chat thread (topic) ID. Integer.'
+    required: false
+    default: ''
+  fail_on_error:
+    description: 'If true, the action exits non-zero when the Telegram request ultimately fails. Default false keeps the job result intact.'
+    required: false
+    default: 'false'
+
+outputs:
+  ok:
+    description: 'true when the message was delivered, false otherwise.'
+    value: ${{ steps.notiflow.outputs.ok }}
+  message_id:
+    description: 'Telegram message_id on success, empty otherwise.'
+    value: ${{ steps.notiflow.outputs.message_id }}
+  http_status:
+    description: 'Last HTTP status received from Telegram (0 for skipped/network error).'
+    value: ${{ steps.notiflow.outputs.http_status }}
+
+runs:
+  using: composite
+  steps:
+    - id: notiflow
+      shell: bash
+      env:
+        NF_BOT_TOKEN: ${{ inputs.bot_token }}
+        NF_CHAT_ID: ${{ inputs.chat_id }}
+        NF_STATUS: ${{ inputs.status }}
+        NF_PARSE_MODE: ${{ inputs.parse_mode }}
+        NF_NOTIFY_ON: ${{ inputs.notify_on }}
+        NF_MESSAGE: ${{ inputs.message }}
+        NF_MESSAGE_TEMPLATE: ${{ inputs.message_template }}
+        NF_TEMPLATE_SUCCESS: ${{ inputs.template_success }}
+        NF_TEMPLATE_FAILURE: ${{ inputs.template_failure }}
+        NF_TEMPLATE_CANCELLED: ${{ inputs.template_cancelled }}
+        NF_TEMPLATE_SKIPPED: ${{ inputs.template_skipped }}
+        NF_DISABLE_WEB_PAGE_PREVIEW: ${{ inputs.disable_web_page_preview }}
+        NF_DISABLE_NOTIFICATION: ${{ inputs.disable_notification }}
+        NF_MESSAGE_THREAD_ID: ${{ inputs.message_thread_id }}
+        NF_FAIL_ON_ERROR: ${{ inputs.fail_on_error }}
+      run: |
+        bash "${{ github.action_path }}/scripts/entrypoint.sh"

@@ -1,0 +1,7 @@
+*.log
+tmp/
+.bats-tmp/
+*.bak
+node_modules/
+coverage/
+tests/.tmp/

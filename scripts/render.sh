@@ -1,0 +1,142 @@
+# shellcheck shell=bash
+# Template selection and placeholder rendering for notiflow. Source-only.
+# Bash 3.2 compatible: no associative arrays.
+
+[ -n "${_NF_RENDER_LOADED:-}" ] && return 0
+_NF_RENDER_LOADED=1
+
+# Known placeholder keys. Order is irrelevant for substitution.
+_NF_PLACEHOLDER_KEYS="Repo Workflow Job Status StatusEmoji Actor Ref RefName Branch Sha ShortSha RunId RunNumber RunUrl EventName ServerUrl"
+
+_nf::_emoji() {
+  case "$1" in
+    success) printf '✅' ;;
+    failure) printf '❌' ;;
+    cancelled) printf '⚠️' ;;
+    skipped) printf '⏭' ;;
+    *) : ;;
+  esac
+}
+
+# _nf::_placeholder_value <key>
+# Echoes the value associated with a known placeholder key, empty if unknown.
+_nf::_placeholder_value() {
+  local sha="${GITHUB_SHA:-}"
+  local short="${sha:0:7}"
+  case "$1" in
+    Repo) printf '%s' "${GITHUB_REPOSITORY:-}" ;;
+    Workflow) printf '%s' "${GITHUB_WORKFLOW:-}" ;;
+    Job) printf '%s' "${GITHUB_JOB:-}" ;;
+    Status) printf '%s' "${NF_STATUS:-}" ;;
+    StatusEmoji) _nf::_emoji "${NF_STATUS:-}" ;;
+    Actor) printf '%s' "${GITHUB_ACTOR:-}" ;;
+    Ref) printf '%s' "${GITHUB_REF:-}" ;;
+    RefName) printf '%s' "${GITHUB_REF_NAME:-}" ;;
+    Branch) printf '%s' "${GITHUB_REF_NAME:-}" ;;
+    Sha) printf '%s' "$sha" ;;
+    ShortSha) printf '%s' "$short" ;;
+    RunId) printf '%s' "${GITHUB_RUN_ID:-}" ;;
+    RunNumber) printf '%s' "${GITHUB_RUN_NUMBER:-}" ;;
+    RunUrl) printf '%s/%s/actions/runs/%s' \
+      "${GITHUB_SERVER_URL:-}" "${GITHUB_REPOSITORY:-}" "${GITHUB_RUN_ID:-}" ;;
+    EventName) printf '%s' "${GITHUB_EVENT_NAME:-}" ;;
+    ServerUrl) printf '%s' "${GITHUB_SERVER_URL:-}" ;;
+    *) return 1 ;;
+  esac
+}
+
+_nf::_default_template() {
+  cat <<'TEMPLATE'
+{{.StatusEmoji}} *{{.Workflow}}* on `{{.Repo}}`
+Status: {{.Status}}
+Branch: {{.Branch}} @ {{.ShortSha}}
+Actor: {{.Actor}}
+[Open run]({{.RunUrl}})
+TEMPLATE
+}
+
+# _nf::_pick_template
+# Selects the active template body based on NF_MESSAGE / NF_TEMPLATE_<STATUS> / NF_MESSAGE_TEMPLATE.
+# Writes the template to stdout. The caller decides whether to render placeholders.
+_nf::_pick_template() {
+  local per_status
+  case "${NF_STATUS:-}" in
+    success) per_status="${NF_TEMPLATE_SUCCESS:-}" ;;
+    failure) per_status="${NF_TEMPLATE_FAILURE:-}" ;;
+    cancelled) per_status="${NF_TEMPLATE_CANCELLED:-}" ;;
+    skipped) per_status="${NF_TEMPLATE_SKIPPED:-}" ;;
+    *) per_status="" ;;
+  esac
+  if [ -n "$per_status" ]; then
+    printf '%s' "$per_status"
+    return
+  fi
+  if [ -n "${NF_MESSAGE_TEMPLATE:-}" ]; then
+    printf '%s' "$NF_MESSAGE_TEMPLATE"
+    return
+  fi
+  _nf::_default_template
+}
+
+_nf::_escape_value() {
+  case "${NF_PARSE_MODE:-MarkdownV2}" in
+    MarkdownV2) nf::escape_md_v2 "$1" ;;
+    HTML) nf::escape_html "$1" ;;
+    Markdown) nf::escape_md_v2 "$1" ;; # treat legacy Markdown as MarkdownV2 for safety
+    none | *) nf::escape_none "$1" ;;
+  esac
+}
+
+# _nf::_sed_rhs_escape <text>
+# Escapes characters that have special meaning on the RHS of sed s/// : & / and \.
+# Newlines are not expected in placeholder values; if present, they are stripped
+# to keep the substitution single-line-safe across BSD/GNU sed.
+_nf::_sed_rhs_escape() {
+  printf '%s' "$1" | tr -d '\n' | sed -e 's/[\\&/]/\\&/g'
+}
+
+nf::render() {
+  # NF_MESSAGE (REQ-5.1): full passthrough, no placeholder substitution, no escape.
+  if [ -n "${NF_MESSAGE:-}" ]; then
+    _nf::_truncate "$NF_MESSAGE"
+    return 0
+  fi
+
+  local template
+  template=$(_nf::_pick_template)
+
+  local key value escaped_value rhs
+  for key in $_NF_PLACEHOLDER_KEYS; do
+    value=$(_nf::_placeholder_value "$key") || value=""
+    escaped_value=$(_nf::_escape_value "$value")
+    rhs=$(_nf::_sed_rhs_escape "$escaped_value")
+    template=$(printf '%s' "$template" | sed "s/{{\\.$key}}/$rhs/g")
+  done
+
+  # Warn and strip unknown placeholders that remain.
+  local remaining
+  remaining=$(printf '%s' "$template" | grep -oE '\{\{\.[A-Za-z][A-Za-z0-9]*\}\}' | sort -u || true)
+  if [ -n "$remaining" ]; then
+    local stray name
+    for stray in $remaining; do
+      name=${stray#'{{.'}
+      name=${name%'}}'}
+      nf::log warn "UNKNOWN_PLACEHOLDER:$name"
+    done
+    template=$(printf '%s' "$template" | sed -E 's/\{\{\.[A-Za-z][A-Za-z0-9]*\}\}//g')
+  fi
+
+  _nf::_truncate "$template"
+}
+
+# _nf::_truncate <text>
+# Prints the input, but no more than 4096 bytes. If longer, the last 3 bytes become "...".
+_nf::_truncate() {
+  local text="$1"
+  local len=${#text}
+  if [ "$len" -le 4096 ]; then
+    printf '%s' "$text"
+  else
+    printf '%s' "${text:0:4093}..."
+  fi
+}
