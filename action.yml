@@ -80,6 +80,9 @@ outputs:
   http_status:
     description: 'Last HTTP status received from Telegram (0 for skipped/network error).'
     value: ${{ steps.notiflow.outputs.http_status }}
+  error:
+    description: 'Error description on failure — Telegram .description when available, otherwise a synthesized reason (HTTP code, network error, exhausted retries). Empty on success and on skip.'
+    value: ${{ steps.notiflow.outputs.error }}
 
 runs:
   using: composite

@@ -37,7 +37,18 @@ teardown() {
   [ "$status" -eq 0 ]
   assert_output_eq ok false
   assert_output_eq http_status 0
+  assert_output_eq error ""
   [ "$(count_mock_requests)" -eq 0 ]
+}
+
+@test "entrypoint: notify_on=any covers all statuses including skipped" {
+  mock_telegram_start "200:success"
+  export NF_STATUS="skipped"
+  export NF_NOTIFY_ON="any"
+  run "${NF_ROOT}/scripts/entrypoint.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_mock_requests)" -eq 1 ]
+  assert_output_eq ok true
 }
 
 @test "entrypoint: fail_on_error=true exits non-zero on 400 (REQ-7.4, CP-13)" {

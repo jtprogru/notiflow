@@ -119,6 +119,22 @@ run_validate() {
   [[ "$output" == *"NF_NOTIFY_ON=success,failure,cancelled"* ]]
 }
 
+@test "validate: notify_on 'any' expands to all four statuses" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="1" NF_STATUS="success" NF_PARSE_MODE="none"
+  export NF_NOTIFY_ON="any"
+  run run_validate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NF_NOTIFY_ON=success,failure,cancelled,skipped"* ]]
+}
+
+@test "validate: notify_on 'all' expands to all four statuses" {
+  export NF_BOT_TOKEN="t" NF_CHAT_ID="1" NF_STATUS="success" NF_PARSE_MODE="none"
+  export NF_NOTIFY_ON="all"
+  run run_validate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NF_NOTIFY_ON=success,failure,cancelled,skipped"* ]]
+}
+
 @test "validate: invalid notify_on item exits 14" {
   export NF_BOT_TOKEN="t" NF_CHAT_ID="1" NF_STATUS="success" NF_NOTIFY_ON="failure,wat"
   run run_validate

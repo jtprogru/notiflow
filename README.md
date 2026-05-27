@@ -35,7 +35,7 @@ jobs:
 | `chat_id` | yes | — | Target chat ID (integer, possibly negative) or `@channel_username`. |
 | `status` | yes | — | Job status. Must be passed explicitly (typically `${{ job.status }}` or `${{ needs.<job>.result }}`). Allowed: `success`, `failure`, `cancelled`, `skipped`. |
 | `parse_mode` | no | `MarkdownV2` | `MarkdownV2`, `HTML`, `Markdown`, or `none`. |
-| `notify_on` | no | `success,failure,cancelled` | Comma-separated statuses that trigger a notification. |
+| `notify_on` | no | `success,failure,cancelled` | Comma-separated statuses that trigger a notification. Accepts `any` or `all` as a shortcut for all four statuses. |
 | `message` | no | _empty_ | Verbatim message. Bypasses templates and placeholder substitution. |
 | `message_template` | no | _empty_ | Default template (used when no per-status template matches). |
 | `template_success` | no | _empty_ | Template used when `status=success`. |
@@ -54,6 +54,7 @@ jobs:
 | `ok` | `true` if the message was delivered, `false` otherwise. |
 | `message_id` | Telegram `message_id` on success. Empty on failure. |
 | `http_status` | Last HTTP status code observed. `0` for skip / network error. |
+| `error` | Error reason on failure — Telegram's `.description` when available, otherwise `HTTP <code>` / `network error (curl exit N)`. Empty on success and on skip. |
 
 ## Template priority
 

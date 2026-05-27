@@ -5,6 +5,12 @@
 [ -n "${_NF_RENDER_LOADED:-}" ] && return 0
 _NF_RENDER_LOADED=1
 
+# Bash 5.2 added the patsub_replacement option (default ON) that makes `&`
+# in the replacement of ${var//pat/repl} expand to the matched pattern, the
+# same as sed. We need literal replacement so placeholder values that contain
+# `&` or `\` survive intact. Disable it; silently ignored on bash < 5.2.
+shopt -u patsub_replacement 2>/dev/null || true
+
 # Known placeholder keys. Order is irrelevant for substitution.
 _NF_PLACEHOLDER_KEYS="Repo Workflow Job Status StatusEmoji Actor Ref RefName Branch Sha ShortSha RunId RunNumber RunUrl EventName ServerUrl"
 

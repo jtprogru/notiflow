@@ -38,6 +38,7 @@ if ! nf::should_notify "$NF_STATUS" "$NF_NOTIFY_ON"; then
   nf::set_output ok false
   nf::set_output message_id ""
   nf::set_output http_status 0
+  nf::set_output error ""
   exit 0
 fi
 

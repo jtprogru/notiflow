@@ -125,6 +125,36 @@ teardown() {
   [ "$(count_mock_requests)" -eq 1 ]
 }
 
+@test "send: 200 success clears error output" {
+  mock_telegram_start "200:success"
+  run nf::send "hi"
+  [ "$status" -eq 0 ]
+  assert_output_eq error ""
+}
+
+@test "send: 400 sets error to Telegram .description" {
+  mock_telegram_start "400:bad_request"
+  run nf::send "hi"
+  [ "$status" -eq 1 ]
+  # Fixture body: {"description": "Bad Request: chat not found"}
+  assert_output_eq error "Bad Request: chat not found"
+}
+
+@test "send: 401 sets error to Telegram .description" {
+  mock_telegram_start "401:unauthorized"
+  run nf::send "hi"
+  [ "$status" -eq 1 ]
+  assert_output_eq error "Unauthorized"
+}
+
+@test "send: 5xx exhausted retries surfaces last HTTP/description" {
+  mock_telegram_start "500:server_error,500:server_error,500:server_error,500:server_error"
+  run nf::send "hi"
+  [ "$status" -eq 1 ]
+  # last_error format: "HTTP 500: internal" (fixture description is "internal")
+  assert_output_eq error "HTTP 500: internal"
+}
+
 @test "send: token never appears in stderr (CP-11)" {
   local logf="${BATS_TEST_TMPDIR}/stderr.log"
   mock_telegram_start "500:server_error,400:bad_request"

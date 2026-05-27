@@ -110,6 +110,9 @@ nf::send() {
   local http_status=0
   local body=""
   local raw
+  # last_error tracks the most recent failure reason across retries. It is
+  # surfaced via the `error` output on terminal failure; empty on success.
+  local last_error=""
 
   while [ "$attempt" -le "$_NF_MAX_ATTEMPTS" ]; do
     local curl_exit
@@ -120,6 +123,7 @@ nf::send() {
       nf::log warn "curl failed (exit=$curl_exit) attempt=$attempt"
       http_status=0
       body=""
+      last_error="network error (curl exit $curl_exit)"
     else
       # Last line of $raw is the http code; everything before is the body.
       http_status=$(printf '%s' "$raw" | tail -n1)
@@ -135,8 +139,10 @@ nf::send() {
           nf::set_output ok true
           nf::set_output message_id "$mid"
           nf::set_output http_status 200
+          nf::set_output error ""
           return 0
         fi
+        last_error=$(printf '%s' "$body" | jq -r '.description // "200 ok=false"' 2>/dev/null)
         nf::log warn "Telegram returned 200 but ok=false attempt=$attempt"
         ;;
       429)
@@ -155,12 +161,20 @@ nf::send() {
           nf::log warn "429 retry_after=${retry_after}s capped at ${cap}s"
           retry_after="$cap"
         fi
+        last_error=$(printf '%s' "$body" | jq -r '.description // "rate limited"' 2>/dev/null)
         if [ "$attempt" -lt "$_NF_MAX_ATTEMPTS" ]; then
           nf::log warn "429 rate-limited; sleeping ${retry_after}s (attempt=$attempt)"
           sleep "$retry_after"
         fi
         ;;
       5*)
+        local desc
+        desc=$(printf '%s' "$body" | jq -r '.description // empty' 2>/dev/null)
+        if [ -n "$desc" ]; then
+          last_error="HTTP $http_status: $desc"
+        else
+          last_error="HTTP $http_status"
+        fi
         if [ "$attempt" -lt "$_NF_MAX_ATTEMPTS" ]; then
           local delay=$((1 << (attempt - 1)))
           nf::log warn "5xx ($http_status); backoff ${delay}s (attempt=$attempt)"
@@ -168,7 +182,7 @@ nf::send() {
         fi
         ;;
       0)
-        # network error — backoff like 5xx
+        # network error — backoff like 5xx (last_error already set above)
         if [ "$attempt" -lt "$_NF_MAX_ATTEMPTS" ]; then
           local delay=$((1 << (attempt - 1)))
           nf::log warn "network error; backoff ${delay}s (attempt=$attempt)"
@@ -176,13 +190,22 @@ nf::send() {
         fi
         ;;
       4*)
-        nf::log error "Telegram returned $http_status (no retry): $(printf '%s' "$body" | jq -r '.description // "."' 2>/dev/null)"
+        local desc4
+        desc4=$(printf '%s' "$body" | jq -r '.description // empty' 2>/dev/null)
+        if [ -n "$desc4" ]; then
+          last_error="$desc4"
+        else
+          last_error="HTTP $http_status"
+        fi
+        nf::log error "Telegram returned $http_status (no retry): $last_error"
         nf::set_output ok false
         nf::set_output message_id ""
         nf::set_output http_status "$http_status"
+        nf::set_output error "$last_error"
         return 1
         ;;
       *)
+        last_error="HTTP $http_status (unexpected)"
         nf::log warn "unexpected http_status=$http_status attempt=$attempt"
         ;;
     esac
@@ -194,5 +217,6 @@ nf::send() {
   nf::set_output ok false
   nf::set_output message_id ""
   nf::set_output http_status "$http_status"
+  nf::set_output error "${last_error:-send failed}"
   return 1
 }

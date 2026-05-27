@@ -2,6 +2,21 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] — 2026-05-27
+
+### Added
+
+- New `error` output. Holds Telegram's `.description` (e.g. `Bad Request: chat not found`, `Unauthorized`) on 4xx; a synthesized `HTTP <code>: <description>` after exhausted 5xx retries; `network error (curl exit N)` after exhausted network-error retries; empty on success and on skip. Pairs naturally with `ok=false` for downstream debug/branching.
+- `notify_on` accepts `any` (alias `all`) as a shortcut for `success,failure,cancelled,skipped`. Saves users from typing the full CSV when they want every status.
+
+### Fixed
+
+- `scripts/render.sh`: `shopt -u patsub_replacement` at load time disables the bash 5.2+ behavior where `&` in a `${var//pat/repl}` replacement expands to the matched pattern. Without this, placeholder values containing `&` or `\` (e.g. branch names, repo names) were corrupted on ubuntu-latest (bash 5.2+) — the v1.3.2 substitution refactor regressed here. Silently ignored on bash < 5.2.
+
+### Tests
+
+- `+7` cases: notify_on shortcut (`any`/`all`), notify_on=any with skipped reaching the wire, and four error-output scenarios (200 clears it, 400/401 surface `.description`, 5xx exhausted surfaces `HTTP <code>: <description>`).
+
 ## [1.3.2] — 2026-05-27
 
 ### Fixed

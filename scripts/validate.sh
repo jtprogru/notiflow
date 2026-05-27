@@ -82,6 +82,13 @@ nf::validate() {
   if [ -z "${NF_NOTIFY_ON:-}" ]; then
     NF_NOTIFY_ON="success,failure,cancelled"
   fi
+  # `any` / `all` shortcut: expand to the full status set so users don't have
+  # to type the CSV. Either keyword behaves identically.
+  case "$NF_NOTIFY_ON" in
+    any | all)
+      NF_NOTIFY_ON="success,failure,cancelled,skipped"
+      ;;
+  esac
   local saved_ifs="$IFS"
   IFS=','
   # shellcheck disable=SC2086  # word-splitting on commas is intentional
