@@ -2,6 +2,18 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.2] — 2026-08-10
+
+### Build
+
+- CI and release workflows bumped to `actions/checkout@v7` (#2). Runtime is untouched: `action.yml` and `scripts/` are byte-identical to v1.6.1, so this release only re-pins the moving `v1` tag.
+
+### Tests
+
+- `mock_telegram_start` now captures the mock server's stderr and prints it (plus the resolved `python3` path and version, and whether the process is still alive) when startup fails. The previous `mock server failed to start` said nothing about *why*, which made the macOS CI failure after `macos-latest` moved from `macos-15-arm64` to `macos-26-arm64` undiagnosable from the logs.
+- Startup wait raised from 5s to 20s, and the loop now breaks immediately if the server process is gone, so a genuinely dead mock fails fast while a slow cold-start runner is no longer a false failure.
+- The port file is truncated before each start. A stale file from a previous test would have ended the wait loop instantly and pointed the client at a dead port.
+
 ## [1.6.1] — 2026-05-27
 
 ### Fixed

@@ -35,23 +35,41 @@ mock_telegram_start() {
   local responses="${1:-200:success}"
   local port_file="${NF_TMP}/mock.port"
   local pid_file="${NF_TMP}/mock.pid"
+  local err_file="${NF_TMP}/mock.err"
   export NF_MOCK_REQ_LOG="${NF_TMP}/requests.log"
   : >"$NF_MOCK_REQ_LOG"
+  # Truncate: a stale port file from a previous test would end the wait loop
+  # below immediately and point the client at a dead port.
+  : >"$port_file"
+  : >"$err_file"
 
   python3 "${NF_ROOT}/tests/fixtures/mock_server.py" \
     --responses "$responses" \
     --log "$NF_MOCK_REQ_LOG" \
     --port-file "$port_file" \
-    --pid-file "$pid_file" &
+    --pid-file "$pid_file" 2>"$err_file" &
   export NF_MOCK_PID=$!
 
-  local i=0
-  while [ ! -s "$port_file" ] && [ $i -lt 50 ]; do
+  # 20s, not the former 5s: interpreter startup on a cold CI runner is slower
+  # than on a warm laptop, and a timeout here fails the test for the wrong reason.
+  local i=0 max=200 alive=yes
+  while [ ! -s "$port_file" ] && [ $i -lt $max ]; do
+    # Server died before binding — no point waiting out the full timeout.
+    kill -0 "$NF_MOCK_PID" 2>/dev/null || {
+      alive=no
+      break
+    }
     sleep 0.1
     i=$((i + 1))
   done
   [ -s "$port_file" ] || {
-    echo "mock server failed to start" >&2
+    {
+      echo "mock server failed to start after $((i / 10))s (process alive: ${alive})"
+      echo "python3: $(command -v python3 || echo '<not on PATH>') -> $(python3 -V 2>&1 || true)"
+      echo "--- mock stderr ---"
+      cat "$err_file" 2>/dev/null
+      echo "--- end mock stderr ---"
+    } >&2
     return 1
   }
   local port
