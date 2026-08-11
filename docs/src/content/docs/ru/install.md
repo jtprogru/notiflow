@@ -97,10 +97,23 @@ gh attestation verify "notiflow-${TARGET}.tar.gz" --repo jtprogru/notiflow
 Релизы начиная с `v2.0.0` дополнительно несут отсоединённые GPG-подписи (файлы `.asc`
 рядом с артефактами), сделанные ключом мейнтейнера:
 
+```
+pub   ed25519 2025-04-14 [SC] [годен до: 2035-04-12]
+      6FE5 73A7 0EEF 276F CAB6  9C64 13B9 59D0 0CED AC9D
+uid   Mikhail Savin (jtprogru) <jtprogru@gmail.com>
+```
+
+Импортируйте ключ и проверьте подпись:
+
 ```bash
+curl -fsSL https://jtprogru.github.io/notiflow/notiflow-signing-key.asc | gpg --import
 curl -fsSLO "${BASE}/notiflow-${TARGET}.tar.gz.asc"
 gpg --verify "notiflow-${TARGET}.tar.gz.asc" "notiflow-${TARGET}.tar.gz"
 ```
+
+Сверьте отпечаток выше с тем, что напечатал `gpg --import`. Ключ, скачанный тем же
+каналом, что и подписанный им файл, — это удобство, а не доказательство: доказательством
+служит отпечаток, сверенный с копией из другого источника.
 
 Пре-релизы `2.0.0-alpha.1` и `2.0.0-alpha.2` старше ключа, `.asc` у них нет. cosign и
 attestation есть у всех релизов, включая эти два.

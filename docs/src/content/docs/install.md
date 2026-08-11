@@ -93,13 +93,26 @@ Releases also carry [build provenance attestations](https://docs.github.com/en/a
 gh attestation verify "notiflow-${TARGET}.tar.gz" --repo jtprogru/notiflow
 ```
 
-Releases from `v2.0.0` onward also carry detached GPG signatures (`.asc` files next to
-each artefact), made with the maintainer's key:
+Releases from `v2.0.0` onward also carry detached GPG signatures (`.asc` files next to each
+artefact), made with the maintainer's key:
+
+```
+pub   ed25519 2025-04-14 [SC] [expires: 2035-04-12]
+      6FE5 73A7 0EEF 276F CAB6  9C64 13B9 59D0 0CED AC9D
+uid   Mikhail Savin (jtprogru) <jtprogru@gmail.com>
+```
+
+Import it, then verify:
 
 ```bash
+curl -fsSL https://jtprogru.github.io/notiflow/notiflow-signing-key.asc | gpg --import
 curl -fsSLO "${BASE}/notiflow-${TARGET}.tar.gz.asc"
 gpg --verify "notiflow-${TARGET}.tar.gz.asc" "notiflow-${TARGET}.tar.gz"
 ```
+
+Check the fingerprint above against what `gpg --import` reports. Fetching a key over the
+same channel as the thing it signs is a convenience, not a proof; the fingerprint is what
+you compare against a copy you got some other way.
 
 The `2.0.0-alpha.1` and `2.0.0-alpha.2` pre-releases predate the signing key and have no
 `.asc` files. cosign and the attestation cover every release, including those two.
