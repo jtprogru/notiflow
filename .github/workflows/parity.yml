@@ -1,0 +1,36 @@
+name: Parity
+
+# Runs the golden corpus through the frozen v1 bash and the v2 binary and diffs them.
+# Kept for as long as v1 is supported; retired when the v1.x branch is archived.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  corpus:
+    name: Golden corpus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Install the tools v1 needs
+        run: sudo apt-get update && sudo apt-get install -y jq bats
+
+      - name: Diff v1 against v2
+        run: make parity
+
+      # If the reference implementation itself has drifted, the corpus is comparing
+      # against something that no longer behaves like v1 — so verify it too.
+      - name: Verify the frozen v1 implementation
+        run: make test-v1

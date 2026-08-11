@@ -1,0 +1,69 @@
+name: Action smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'action.yml'
+      - 'scripts/action/**'
+      - 'src/**'
+      - 'tests/action/**'
+      - 'tests/mock_server.py'
+      - '.github/workflows/action-smoke.yml'
+  pull_request:
+    paths:
+      - 'action.yml'
+      - 'scripts/action/**'
+      - 'src/**'
+      - 'tests/action/**'
+      - 'tests/mock_server.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wrapper:
+    name: Wrapper (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      # The wrapper is bash on every runner, Windows included, where GitHub's `bash` shell
+      # is git-bash. Running it there is the only way to learn that the env mapping and the
+      # `.exe` naming survive the platform.
+      - name: Smoke-test the wrapper against a local mock Telegram
+        shell: bash
+        run: make action-smoke
+
+      - name: Detailed wrapper tests
+        # bats-core is not worth installing on Windows; make action-smoke above is the
+        # portable check, and this is the detailed one everywhere else.
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install bats-core jq
+          else
+            sudo apt-get update && sudo apt-get install -y bats jq
+          fi
+          make test-action
+
+  manifest:
+    name: action.yml manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y bats
+      # Guards the class of bug that took v1.6.0 down: a ${{ }} expression inside a
+      # description is evaluated at manifest-load time and aborts every calling workflow.
+      - run: bats tests/action/manifest.bats
