@@ -2,6 +2,50 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.1] — 2026-08-10
+
+notiflow is now a Rust binary. The GitHub Action downloads and runs it; the same binary is also a standalone CLI. The bash implementation is frozen on the `v1.x` branch and kept in this tree under `tests/parity/v1/` as the reference the parity suite compares against.
+
+For a workflow that sends to one chat, `jtprogru/notiflow@v1` → `@v2` is a drop-in change. See the [migration guide](https://jtprogru.github.io/notiflow/action/migration/).
+
+### Removed
+
+- **Breaking.** Multi-chat fan-out. `chat_id` accepts exactly one chat; a comma exits `11`. `edit_message_id` accepts one integer. The `message_id` output is a scalar rather than a CSV with empty slots, `error` is the raw reason without a `chat <id>:` prefix, and `http_status` is the status of the one request. Use a job matrix or repeated steps — both give per-chat outputs and per-chat status, which the aggregated CSV could not. Tracked as a feature request rather than deleted from memory.
+- The bash runtime, and with it the dependency on `bash`, `curl`, `jq`, `iconv`, `mktemp` and `python3`. Exit codes `20` (`UNSUPPORTED_BASH`) and `22` (`MISSING_DEPENDENCY`) are permanently reserved and never emitted.
+
+### Added
+
+- A CLI: `notiflow send | edit | render | whoami | completions`, from Homebrew, crates.io, or a release archive. Reads stdin, so it works at the end of a pipeline.
+- A config file at `~/.config/notiflow/config.toml` with named profiles (`--profile work`), and a permissions warning when a file holding a token is readable beyond its owner.
+- `notiflow render` — render a template locally with no token and no network, with `--explain` reporting which template won, whether truncation happened, and which placeholders were unknown.
+- `notiflow whoami` — check a token against `getMe`.
+- `--dry-run`, which prints the exact JSON body that would have been posted.
+- Placeholders resolve outside GitHub Actions: `Repo`, `Branch`, `Ref`, `Sha`, `ShortSha` and `Actor` come from the local git checkout when the `GITHUB_*` variables are absent.
+- Windows runners are supported.
+- `verify_signature` input for a cosign check on the downloaded binary; releases carry keyless cosign signatures, GPG signatures and SLSA build-provenance attestations alongside `checksums.txt`.
+- A `version` input, plus a `VERSION` file stamped at release time so `@v2`, `@v2.1.0` and `@<sha>` all resolve deterministically without a network call.
+- Exit codes `17` (`CONFIG_ERROR`), `18` (`INVALID_ARGUMENT`) and `30` (`IO_ERROR`).
+- A documentation site at <https://jtprogru.github.io/notiflow/>, English with a Russian locale. The Action's input and output tables, the CLI reference, and the exit-code and placeholder tables are generated from the code; CI fails when the committed copies drift.
+- A golden parity corpus (`make parity`) that runs 52 cases through both implementations and diffs them. A v2 result that differs from v1 without a declared reason fails the build.
+
+### Fixed
+
+- **Placeholders are substituted in one pass.** v1 substituted key by key in a loop, so a value inserted early was rescanned by every later iteration; a workflow named `{{.Actor}}` really did expand under `parse_mode: none` and `HTML`. MarkdownV2 escaping hid it by accident.
+- **Truncation cuts on markup boundaries.** v1 cut on a raw UTF-16 code-unit boundary and could sever a MarkdownV2 escape pair, an HTML entity or a tag, producing a `400` on a message whose only fault was length. v2 cuts between markup tokens and closes HTML tags left open by the cut.
+- **Long messages ending mid-emoji no longer abort on macOS.** BSD `iconv` exits non-zero on a trailing incomplete character even with `-c`, so v1's truncation died inside `_nf::_truncate` and, under `set -e`, took the whole send with it. Found by the parity corpus, not by the plan.
+- **The token is scrubbed from every stream.** `::add-mask::` covers the workflow log but not the CLI, and an HTTP error can carry a URL containing `bot<TOKEN>`. Everything notiflow prints is filtered, including any `/bot<token>/` path segment for a token it was never told about.
+- **`Retry-After` is honoured.** v1 read only `parameters.retry_after` from the body; proxies and self-hosted Bot API servers send the header instead.
+- **Backoff has jitter** (up to 50%), so a fleet of jobs rate-limited together stops retrying in lockstep and re-triggering the limit.
+- `--bot-token` on the command line now warns: arguments are readable by every process on the machine.
+
+### Changed
+
+- `disable_web_page_preview` keeps its input name but is sent as `link_preview_options.is_disabled`; Telegram deprecated the flat field.
+- `api_base` policy depends on the mode. Inside Actions the allowlist is unchanged (`api.telegram.org` plus loopback). From the CLI, `--api-base` accepts any `http(s)` URL — a self-hosted Bot API server is a legitimate setup and the value is the user's own explicit choice.
+- `RunUrl` renders empty outside Actions instead of the half-built `//actions/runs/` string v1 produced.
+- Every CI step calls a `make` target, so a red build is reproducible locally with one command.
+- `.spec/` was removed. It described the bash implementation and would have started lying on day one; its durable content lives in the architecture page and in the test corpus.
+
 ## [1.6.2] — 2026-08-10
 
 ### Build
