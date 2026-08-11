@@ -3,6 +3,14 @@
 [![CI](https://github.com/jtprogru/notiflow/actions/workflows/ci.yml/badge.svg)](https://github.com/jtprogru/notiflow/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+> **This is the v1 branch. Development happens on `main`, where notiflow is a Rust binary.**
+>
+> `v1` is the bash implementation, frozen and receiving security fixes only. It keeps working: the `v1` tag still points here and nothing about it is going away.
+>
+> For a workflow that sends to one chat, `jtprogru/notiflow@v1` → `@v2` is a drop-in change — same inputs, same outputs, same exit codes 10–16. The one breaking change is that `chat_id` no longer accepts a comma-separated list. Everything else that changed is a fix to behaviour that was already broken, and every difference is recorded in a parity corpus that runs both implementations against each other.
+>
+> See the [migration guide](https://jtprogru.github.io/notiflow/action/migration/) and the [documentation site](https://jtprogru.github.io/notiflow/).
+
 `notiflow` is a composite GitHub Action that sends a Telegram message when a workflow job completes. It supports custom message templates, per-status overrides, MarkdownV2/HTML/Markdown/plain rendering, retry on rate limits, forum-chat threads, and silent delivery.
 
 ## Usage
