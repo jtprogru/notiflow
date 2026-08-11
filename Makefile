@@ -159,8 +159,20 @@ dist: ## Cross-build one release archive (make dist TARGET=aarch64-apple-darwin)
 	@test -n "$(TARGET)" || { echo "usage: make dist TARGET=<rust-target>"; exit 1; }
 	$(CARGO) build --release --locked --target $(TARGET)
 	@mkdir -p dist
+	@# GitHub's Windows image ships 7-Zip and PowerShell but not necessarily `zip`, and this
+	@# path only ever runs during a release — where discovering that is expensive. Try each.
 	@if [[ "$(TARGET)" == *windows* ]]; then \
-	  (cd target/$(TARGET)/release && zip -q -X "$(CURDIR)/dist/$(BIN)-$(TARGET).zip" $(BIN).exe); \
+	  src="target/$(TARGET)/release/$(BIN).exe"; out="$(CURDIR)/dist/$(BIN)-$(TARGET).zip"; \
+	  rm -f "$$out"; \
+	  if command -v zip >/dev/null; then \
+	    (cd "target/$(TARGET)/release" && zip -q -X "$$out" "$(BIN).exe"); \
+	  elif command -v 7z >/dev/null; then \
+	    (cd "target/$(TARGET)/release" && 7z a -tzip -bso0 -bsp0 "$$out" "$(BIN).exe"); \
+	  elif command -v powershell >/dev/null; then \
+	    powershell -NoProfile -Command "Compress-Archive -Path '$$src' -DestinationPath '$$out' -Force"; \
+	  else \
+	    echo "no zip, 7z or powershell available to build $$out" >&2; exit 1; \
+	  fi; \
 	else \
 	  tar -czf dist/$(BIN)-$(TARGET).tar.gz -C target/$(TARGET)/release $(BIN); \
 	fi
