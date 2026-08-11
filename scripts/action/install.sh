@@ -60,7 +60,21 @@ fi
 
 case "$EXT" in
   tar.gz) tar -xzf "${tmp}/${archive}" -C "$DEST" ;;
-  zip) unzip -q -o "${tmp}/${archive}" -d "$DEST" ;;
+  zip)
+    # `unzip` is not guaranteed on a Windows runner — git-bash does not ship it. 7-Zip and
+    # PowerShell both are, so try each rather than fail on somebody else's image.
+    if command -v unzip >/dev/null 2>&1; then
+      unzip -q -o "${tmp}/${archive}" -d "$DEST"
+    elif command -v 7z >/dev/null 2>&1; then
+      7z x -y -bso0 -bsp0 -o"$DEST" "${tmp}/${archive}"
+    elif command -v powershell >/dev/null 2>&1; then
+      powershell -NoProfile -Command \
+        "Expand-Archive -Path '$(cygpath -w "${tmp}/${archive}" 2>/dev/null || echo "${tmp}/${archive}")' -DestinationPath '$(cygpath -w "$DEST" 2>/dev/null || echo "$DEST")' -Force"
+    else
+      echo "::error::no unzip, 7z or powershell available to extract ${archive}" >&2
+      exit 1
+    fi
+    ;;
   *)
     echo "::error::unknown archive extension '${EXT}'" >&2
     exit 1
