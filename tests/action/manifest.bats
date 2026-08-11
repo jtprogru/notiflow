@@ -133,6 +133,24 @@ nf_forbidden_grep() {
   }
 }
 
+@test "manifest: no \${{ github.action_path }} or \${{ runner.* }} inside a run: command" {
+  # A ${{ }} expression is substituted into the script text before bash parses it. On a
+  # Windows runner github.action_path is `D:\a\notiflow\notiflow`, so bash eats the
+  # backslashes as escapes and runs `D:anotiflownotiflow/scripts/...`, exit 127. The Action
+  # had never worked on a Windows runner for exactly this reason: the wrapper smoke test
+  # invokes scripts/action/run.sh directly and never goes through this manifest.
+  #
+  # $GITHUB_ACTION_PATH and $RUNNER_TOOL_CACHE carry the same values without a second
+  # parsing pass. Anything else a step needs comes in through `env:`, which is YAML.
+  local hits
+  hits=$(grep -nE '^[[:space:]]*run:.*\$\{\{[[:space:]]*(github\.action_path|runner\.)' "$ACTION_YML" || true)
+  if [ -n "$hits" ]; then
+    echo "path expression interpolated into a run: command (use \$GITHUB_ACTION_PATH / \$RUNNER_TOOL_CACHE, or pass it via env:):" >&2
+    echo "$hits" >&2
+    return 1
+  fi
+}
+
 @test "manifest: status input is required and has no default" {
   # Parse the `status:` input block (until the next top-level input key) and
   # verify it declares required: true and no default: field.
