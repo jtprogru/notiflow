@@ -17,6 +17,9 @@ on:
       - 'src/**'
       - 'tests/action/**'
       - 'tests/mock_server.py'
+      # Without this, a pull request that edits these jobs does not run them, which is how
+      # the fixture bump that added this line arrived with no coverage of its own.
+      - '.github/workflows/action-smoke.yml'
   workflow_dispatch:
 
 permissions:
