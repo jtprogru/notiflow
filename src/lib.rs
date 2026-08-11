@@ -20,6 +20,20 @@
 //! let report = run(&config, RunOptions::default()).unwrap();
 //! println!("delivered: {}", report.ok);
 //! ```
+//!
+//! # What semver covers here
+//!
+//! The stable surface of this crate is the `notiflow` command line and the GitHub Action
+//! built on it: their flags, inputs, outputs and exit codes follow semver, and the parity
+//! corpus exists to keep them honest.
+//!
+//! The library is published because the binary is. Its items are `pub` so that the binary,
+//! the integration tests and the doc generators can reach across module boundaries, not
+//! because there is an external consumer whose build this crate has promised not to break.
+//! Treat everything below as internal: signatures, fields and variants can change in a
+//! minor release. If you are depending on it anyway, pin an exact version and open an
+//! issue — a real contract can be drawn around the parts somebody actually uses, which is
+//! a better trade than freezing all of it blind.
 
 pub mod actions;
 pub mod cli;

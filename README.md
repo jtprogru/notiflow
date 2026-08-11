@@ -42,7 +42,7 @@ notiflow whoami
 
 Outside a workflow, `{{.Repo}}`, `{{.Branch}}` and `{{.ShortSha}}` come from the local git checkout, so the same template works in both places.
 
-Release archives are published for seven targets — including static `musl` builds for `alpine` and `scratch` containers — with sha256 checksums, keyless cosign signatures, GPG signatures and SLSA build provenance. See [Installation](https://jtprogru.github.io/notiflow/install/).
+Release archives are published for seven targets — including static `musl` builds for `alpine` and `scratch` containers — with sha256 checksums, keyless cosign signatures and SLSA build provenance on every release, and detached GPG signatures from `v2.0.0` onward. See [Installation](https://jtprogru.github.io/notiflow/install/) for the signing key and the verification commands.
 
 ## What it does for you
 
