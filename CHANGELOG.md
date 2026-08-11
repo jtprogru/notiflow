@@ -8,6 +8,7 @@ Release-readiness work for `2.0.0`. Every item here is a path that had never exe
 
 ### Fixed
 
+- **The Action now works on a Windows runner.** It never has. Every step reached the action's own tree through `${{ github.action_path }}`, which is substituted into the script text before bash parses it; on Windows the value is `D:\a\notiflow\notiflow`, bash ate the backslashes as escapes, and the first step exited 127 as `D:anotiflownotiflow/scripts/...`. The manifest, the docs and the `2.0.0-alpha.1` entry claiming Windows support were all wrong. Steps now go through `$GITHUB_ACTION_PATH` and `$RUNNER_TOOL_CACHE`, which carry the same values without a second parsing pass, and a manifest test guards the class. Found by the end-to-end job below on its first run, which is the whole argument for having it.
 - The Homebrew job no longer assumes a GPG key exists. It imported one unconditionally and committed with `-S`, unlike `publish`, which grew a guard in `2.0.0-alpha.2`. Without the key the formula update dies and `continue-on-error` swallows it, so `brew install jtprogru/tap/notiflow` — the first install line in the README — would have kept pointing at nothing while the release reported success.
 - The Action refuses to resolve a version below `v2.0.0`. `releases/latest` skips pre-releases, so until the stable tag exists it answers with `v1.6.1`, a bash release with no binary archive in it, and `install.sh` failed on a bare 404 several steps away from the input that caused it.
 
