@@ -1,0 +1,20 @@
+---
+title: CLI reference
+description: Every command and flag, generated from the argument parser.
+---
+
+import { Content as CliReference } from '../../../generated/cli.md';
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="Generated">
+  This page comes out of the `clap` command tree via `make gen`. CI fails when the
+  committed copy differs from a fresh generation, so it cannot fall behind the binary.
+</Aside>
+
+<CliReference />
+
+## Also available
+
+`notiflow --help` prints the same information, and `notiflow <command> --help` narrows it
+to one command. The library API is documented separately on
+[docs.rs](https://docs.rs/notiflow).

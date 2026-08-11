@@ -1,0 +1,59 @@
+---
+title: notiflow
+description: Telegram-нотификатор для CI и терминала — GitHub Action и CLI в одном бинаре.
+template: splash
+hero:
+  tagline: Сообщить в Telegram, что что-то закончилось. Из workflow или из шелла.
+  actions:
+    - text: Начать
+      link: /notiflow/ru/getting-started/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/jtprogru/notiflow
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Один бинарь, два лица" icon="rocket">
+    GitHub Action и CLI `notiflow` — это один и тот же бинарь на Rust. Шаблон, который
+    рендерится в workflow, точно так же рендерится у тебя в терминале.
+  </Card>
+  <Card title="Никакого рантайма" icon="seti:rust">
+    Один статический исполняемый файл. Ни bash, ни `curl`, ни `jq`, ни Python. Linux,
+    macOS и Windows-раннеры одинаково.
+  </Card>
+  <Card title="Безопасно по построению" icon="approve-check">
+    Значения плейсхолдеров экранируются под parse mode, обрезка идёт по границам разметки,
+    а токен вычищается из всего, что notiflow печатает.
+  </Card>
+  <Card title="Честно про сбои" icon="warning">
+    Ретраи с джиттером, учёт `Retry-After`, 4xx не ретраится, и документированный exit-код
+    на каждый способ упасть.
+  </Card>
+</CardGrid>
+
+## Тридцать секунд в workflow
+
+```yaml
+- uses: jtprogru/notiflow@v2
+  if: always()
+  with:
+    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+    status: ${{ job.status }}
+```
+
+## Тридцать секунд в терминале
+
+```bash
+brew install jtprogru/tap/notiflow
+export NOTIFLOW_BOT_TOKEN=123456:AA...
+notiflow send --chat-id -1001234567890 --message "деплой закончился"
+./long-build.sh | notiflow send -c -1001234567890 --stdin
+```
+
+Переезжаешь с v1? Входы не изменились, кроме одного удаления — см.
+[гайд по миграции](/notiflow/ru/action/migration/).

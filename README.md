@@ -1,239 +1,73 @@
 # notiflow
 
 [![CI](https://github.com/jtprogru/notiflow/actions/workflows/ci.yml/badge.svg)](https://github.com/jtprogru/notiflow/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![crates.io](https://img.shields.io/crates/v/notiflow.svg)](https://crates.io/crates/notiflow)
+[![docs.rs](https://img.shields.io/docsrs/notiflow)](https://docs.rs/notiflow)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-`notiflow` is a composite GitHub Action that sends a Telegram message when a workflow job completes. It supports custom message templates, per-status overrides, MarkdownV2/HTML/Markdown/plain rendering, retry on rate limits, forum-chat threads, and silent delivery.
+Send a Telegram message when something finishes — a workflow job, a deploy script, a long build.
 
-## Usage
+The GitHub Action and the `notiflow` CLI are the same Rust binary, so a template that renders in your workflow renders identically in your terminal. No bash, no `curl`, no `jq`, no Python: one static executable, on Linux, macOS and Windows.
 
-```yaml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: ./run-tests.sh
+**[Documentation](https://jtprogru.github.io/notiflow/)** · [Getting started](https://jtprogru.github.io/notiflow/getting-started/) · [Migrating from v1](https://jtprogru.github.io/notiflow/action/migration/) · [Документация на русском](https://jtprogru.github.io/notiflow/ru/)
 
-  notify:
-    needs: build
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: jtprogru/notiflow@v1
-        with:
-          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
-          status:    ${{ needs.build.result }}
-```
-
-## Inputs
-
-| Name | Required | Default | Description |
-|------|----------|---------|-------------|
-| `bot_token` | yes | — | Telegram bot token (store as a secret). |
-| `chat_id` | yes | — | Target chat ID (integer, possibly negative) or `@channel_username`. Accepts a comma-separated list to fan out to multiple chats; each item is validated independently. Whitespace around items is tolerated. |
-| `status` | yes | — | Job status. Must be passed explicitly (typically `${{ job.status }}` or `${{ needs.<job>.result }}`). Allowed: `success`, `failure`, `cancelled`, `skipped`. |
-| `parse_mode` | no | `MarkdownV2` | `MarkdownV2`, `HTML`, `Markdown`, or `none`. |
-| `notify_on` | no | `success,failure,cancelled` | Comma-separated statuses that trigger a notification. Accepts `any` or `all` as a shortcut for all four statuses. |
-| `message` | no | _empty_ | Verbatim message. Bypasses templates and placeholder substitution. |
-| `message_template` | no | _empty_ | Default template (used when no per-status template matches). |
-| `template_success` | no | _empty_ | Template used when `status=success`. |
-| `template_failure` | no | _empty_ | Template used when `status=failure`. |
-| `template_cancelled` | no | _empty_ | Template used when `status=cancelled`. |
-| `template_skipped` | no | _empty_ | Template used when `status=skipped`. |
-| `disable_web_page_preview` | no | `true` | Suppress link previews. |
-| `disable_notification` | no | `false` | Send silently. |
-| `message_thread_id` | no | _empty_ | Forum-chat thread (topic) ID. Integer. |
-| `fail_on_error` | no | `false` | If true, the action exits non-zero when Telegram delivery ultimately fails. |
-| `edit_message_id` | no | _empty_ | If set, edits the message via `editMessageText` instead of sending a fresh one. Integer for single-chat, or a CSV whose length must match `chat_id` for multi-chat (paired by index). `disable_notification` and `message_thread_id` are silently dropped when editing — Telegram rejects them on edit. |
-
-## Outputs
-
-| Name | Description |
-|------|-------------|
-| `ok` | `true` if the message was delivered to **every** chat in `chat_id`, `false` otherwise. |
-| `message_id` | Telegram `message_id` on single-chat success. For CSV `chat_id`, a CSV of message_ids in input order with an empty slot for any failed chat (e.g. `42,,103`). Empty entirely on single-chat failure or skip. |
-| `http_status` | Last HTTP status code observed. `200` if all chats succeeded; otherwise the first non-200 status seen. `0` for skip / network error. |
-| `error` | Error reason on failure — Telegram's `.description` when available, otherwise `HTTP <code>` / `network error (curl exit N)`. Single-chat: raw reason. Multi-chat: each failed chat formatted as `chat <id>: <reason>`, joined with `; `. Empty on success and on skip. |
-
-## Template priority
-
-Highest wins:
-
-1. `message` — verbatim text. No placeholder substitution, no escaping (you own the output).
-2. `template_<status>` — matches the current status.
-3. `message_template` — common template.
-4. Built-in default template (status emoji, workflow, repo, branch, short SHA, actor, run URL).
-
-## Placeholders
-
-Available inside templates as `{{.Field}}`. Values are escaped according to `parse_mode` before substitution.
-
-| Placeholder | Value |
-|-------------|-------|
-| `{{.Repo}}` | `owner/repo` |
-| `{{.Workflow}}` | Workflow name |
-| `{{.Job}}` | Job name |
-| `{{.Status}}` | `success` / `failure` / `cancelled` / `skipped` |
-| `{{.StatusEmoji}}` | `✅` / `❌` / `⚠️` / `⏭` |
-| `{{.Actor}}` | GitHub actor (login) |
-| `{{.Ref}}` | Full ref (`refs/heads/main`) |
-| `{{.RefName}}` | Short ref (`main`) |
-| `{{.Branch}}` | Alias for `RefName` |
-| `{{.Sha}}` | Full commit SHA |
-| `{{.ShortSha}}` | First 7 characters of SHA |
-| `{{.RunId}}` | Run ID |
-| `{{.RunNumber}}` | Run number |
-| `{{.RunUrl}}` | Link to the run page |
-| `{{.EventName}}` | Triggering event |
-| `{{.ServerUrl}}` | `https://github.com` (or GHES URL) |
-
-Unknown placeholders are removed and produce a `::warning::UNKNOWN_PLACEHOLDER:<name>` annotation.
-
-## Examples
-
-### Custom message template
+## As a GitHub Action
 
 ```yaml
-- uses: jtprogru/notiflow@v1
+- uses: jtprogru/notiflow@v2
+  if: always()
   with:
     bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
-    status:    ${{ job.status }}
-    message_template: |
-      {{.StatusEmoji}} *{{.Workflow}}* on `{{.Repo}}`@`{{.Branch}}`
-      by *{{.Actor}}* — [open run]({{.RunUrl}})
+    chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+    status: ${{ job.status }}
 ```
 
-### Per-status templates
+`if: always()` matters — without it the step is skipped exactly when the job failed, which is when you wanted to hear about it. `status` has to be passed explicitly: a composite action's input defaults cannot read the `job` context.
 
-```yaml
-- uses: jtprogru/notiflow@v1
-  with:
-    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
-    status:    ${{ job.status }}
-    template_success: "✅ {{.Repo}} build {{.RunNumber}} is green"
-    template_failure: |
-      ❌ {{.Repo}} build {{.RunNumber}} *FAILED*
-      Actor: {{.Actor}}
-      Run: {{.RunUrl}}
+Full input and output tables are in the [Action reference](https://jtprogru.github.io/notiflow/action/reference/).
+
+## As a CLI
+
+```bash
+brew install jtprogru/tap/notiflow     # or: cargo install notiflow
+
+export NOTIFLOW_BOT_TOKEN=123456789:AAHdqTcv...
+export NOTIFLOW_CHAT_ID=-1001234567890
+
+notiflow send --message "deploy finished"
+./deploy.sh | notiflow send --stdin
+notiflow render --template '{{.StatusEmoji}} {{.Repo}} @ {{.ShortSha}}' --explain
+notiflow whoami
 ```
 
-### Notify only on failure or cancellation
+Outside a workflow, `{{.Repo}}`, `{{.Branch}}` and `{{.ShortSha}}` come from the local git checkout, so the same template works in both places.
 
-```yaml
-- uses: jtprogru/notiflow@v1
-  with:
-    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
-    status:    ${{ needs.build.result }}
-    notify_on: 'failure,cancelled'
-```
+Release archives are published for seven targets — including static `musl` builds for `alpine` and `scratch` containers — with sha256 checksums, keyless cosign signatures, GPG signatures and SLSA build provenance. See [Installation](https://jtprogru.github.io/notiflow/install/).
 
-### Edit a previous message (dedupe progress updates)
+## What it does for you
 
-```yaml
-- id: notify_start
-  uses: jtprogru/notiflow@v1
-  with:
-    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
-    status:    success
-    message:   '⏳ Build started'
+Placeholder values are escaped for the active parse mode, so a branch named `fix/a.b-c` cannot inject markup. Messages over Telegram's 4096-unit limit are cut between markup tokens rather than through them, and open HTML tags are closed. Rate limits are honoured, `Retry-After` is read from both the body and the header, backoff carries jitter, and a `4xx` is never retried. The bot token is masked in the workflow log and scrubbed from every stream the binary writes.
 
-- run: ./long-running-build.sh
+A delivery failure exits 0 by default: notiflow's opinion about Telegram should not overwrite the result your build actually produced. Set `fail_on_error` when it should.
 
-- if: always()
-  uses: jtprogru/notiflow@v1
-  with:
-    bot_token:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:         ${{ secrets.TELEGRAM_CHAT_ID }}
-    status:          ${{ job.status }}
-    edit_message_id: ${{ steps.notify_start.outputs.message_id }}
-    message:         '✅ Build done'
-```
+## Upgrading from v1
 
-For multi-chat edits, wire the CSV `message_id` from the previous step into `edit_message_id` directly — same index pairing in, same shape out.
+For a workflow that sends to one chat, `@v1` → `@v2` is a drop-in change: same inputs, same outputs, same exit codes 10–16.
 
-### Fan-out to multiple chats
+The one breaking change is that `chat_id` no longer accepts a comma-separated list — use a job matrix or repeat the step, and you get per-chat outputs and per-chat status instead of a lossy CSV. Everything else that changed is a fix to behaviour that was already broken. All of it is spelled out in the [migration guide](https://jtprogru.github.io/notiflow/action/migration/), and every difference is recorded in a parity corpus that runs both implementations against each other on every commit.
 
-```yaml
-- uses: jtprogru/notiflow@v1
-  with:
-    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:   '${{ secrets.TELEGRAM_CHAT_ID }},@release_channel,-1001234567890'
-    status:    ${{ job.status }}
-```
-
-`message_id` becomes a CSV in input order (e.g. `42,99,103`). On partial failure the failed slot is empty (`42,,103`) and `error` enumerates the failed chats (`chat @release_channel: Forbidden; chat -1001234567890: chat not found`). `ok=false` and `http_status` reports the first non-200 status.
-
-### Forum chat thread
-
-```yaml
-- uses: jtprogru/notiflow@v1
-  with:
-    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:   ${{ secrets.TELEGRAM_CHAT_ID }}
-    status:    ${{ job.status }}
-    message_thread_id: '123'
-```
-
-### HTML parse_mode
-
-```yaml
-- uses: jtprogru/notiflow@v1
-  with:
-    bot_token:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:    ${{ secrets.TELEGRAM_CHAT_ID }}
-    status:     ${{ job.status }}
-    parse_mode: 'HTML'
-    message_template: |
-      <b>{{.Workflow}}</b> @ <code>{{.Repo}}</code>
-      Status: {{.Status}}
-      Actor: <i>{{.Actor}}</i>
-      <a href="{{.RunUrl}}">Open run</a>
-```
-
-### Verbatim message (no escaping, no templating)
-
-```yaml
-- uses: jtprogru/notiflow@v1
-  with:
-    bot_token:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
-    chat_id:    ${{ secrets.TELEGRAM_CHAT_ID }}
-    status:     ${{ job.status }}
-    parse_mode: 'none'
-    message:    'Plain text alert — no placeholders, no escaping'
-```
-
-## Behavior notes
-
-- **Token masking.** The first action `notiflow` takes is `::add-mask::<bot_token>`, so the token never leaks in subsequent log lines.
-- **Default `fail_on_error: false`.** Telegram delivery is a side-channel — when it fails (network, rate-limit exhausted, 4xx) the action still exits 0 with `ok=false`. Set `fail_on_error: true` to surface failures.
-- **Retry policy.** Up to 4 attempts. `429` honors `parameters.retry_after` from the response body. `5xx` and network errors use 1s/2s/4s exponential backoff. `4xx` other than `429` is final — no retry.
-- **Length limit.** Telegram caps messages at 4096 UTF-16 code units. BMP codepoints (including Cyrillic) count as 1 unit each; supplementary-plane codepoints (most emoji) count as 2 each. Longer renders are truncated to 4093 units + `...`, aligned to codepoint boundaries.
-- **Verbatim `message`.** Bypasses both templating and escaping. With `parse_mode=MarkdownV2`/`HTML` you are responsible for valid markup.
-
-## Requirements
-
-- A Linux, macOS, or Windows GitHub-hosted runner (defaults: bash, curl, jq, iconv are available).
-- For self-hosted runners: bash 3.2+, `curl`, `jq`, `iconv` on `PATH`.
+The `v1` tag keeps pointing at the bash implementation on the `v1.x` branch, which receives security fixes only.
 
 ## Development
 
 ```bash
-make install-tools    # bats-core, shellcheck, shfmt, actionlint, jq
-make lint             # shellcheck + shfmt -d + actionlint
-make lint-fix         # shfmt -w
-make test             # bats tests/
+make build      # the debug binary
+make ci         # lint, test, parity, generated-doc check — what CI runs
+make help       # everything else
 ```
 
-## Versioning
-
-[Semantic Versioning](https://semver.org/). The `v1` tag is a moving major tag that always points at the latest `v1.x.y` release. Pin to `v1` for automatic patch/minor updates, or to a fixed tag (`v1.2.3`) for reproducible builds.
+No workflow contains a build command of its own; every CI step calls a make target, so a red build is reproducible with one command. See [Contributing](https://jtprogru.github.io/notiflow/contributing/).
 
 ## License
 
-[MIT](LICENSE) © 2026 Mikhail Savin.
+MIT — see [LICENSE](LICENSE).

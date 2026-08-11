@@ -1,0 +1,59 @@
+---
+title: notiflow
+description: Telegram notifier for CI and the terminal — a GitHub Action and a standalone CLI in one binary.
+template: splash
+hero:
+  tagline: Tell Telegram when something finished. From a workflow, or from your shell.
+  actions:
+    - text: Getting started
+      link: /notiflow/getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/jtprogru/notiflow
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="One binary, two faces" icon="rocket">
+    The GitHub Action and the `notiflow` CLI are the same Rust binary. A template that
+    renders in your workflow renders the same way in your terminal.
+  </Card>
+  <Card title="No runtime to install" icon="seti:rust">
+    A single static executable. No bash, no `curl`, no `jq`, no Python. Works on Linux,
+    macOS and Windows runners alike.
+  </Card>
+  <Card title="Safe by construction" icon="approve-check">
+    Placeholder values are escaped for the parse mode, messages are truncated on markup
+    boundaries, and the bot token is scrubbed from every stream notiflow writes.
+  </Card>
+  <Card title="Honest about failure" icon="warning">
+    Retries with jitter, `Retry-After` honoured, 4xx never retried, and a documented exit
+    code for every way a run can go wrong.
+  </Card>
+</CardGrid>
+
+## Thirty seconds in a workflow
+
+```yaml
+- uses: jtprogru/notiflow@v2
+  if: always()
+  with:
+    bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+    status: ${{ job.status }}
+```
+
+## Thirty seconds in a terminal
+
+```bash
+brew install jtprogru/tap/notiflow
+export NOTIFLOW_BOT_TOKEN=123456:AA...
+notiflow send --chat-id -1001234567890 --message "deploy finished"
+./long-build.sh | notiflow send -c -1001234567890 --stdin
+```
+
+Upgrading from v1? The inputs are unchanged except for one removal — see the
+[migration guide](/notiflow/action/migration/).
