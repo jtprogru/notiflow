@@ -2,6 +2,28 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Release-readiness work for `2.0.0`. Every item here is a path that had never executed: the code was ready before the pipeline that ships it was.
+
+### Fixed
+
+- The Homebrew job no longer assumes a GPG key exists. It imported one unconditionally and committed with `-S`, unlike `publish`, which grew a guard in `2.0.0-alpha.2`. Without the key the formula update dies and `continue-on-error` swallows it, so `brew install jtprogru/tap/notiflow` — the first install line in the README — would have kept pointing at nothing while the release reported success.
+- The Action refuses to resolve a version below `v2.0.0`. `releases/latest` skips pre-releases, so until the stable tag exists it answers with `v1.6.1`, a bash release with no binary archive in it, and `install.sh` failed on a bare 404 several steps away from the input that caused it.
+
+### Added
+
+- An end-to-end CI job that runs the composite action itself (`uses: ./`) on Linux, macOS and Windows against a published release, with `verify_signature: true` and a second run over a warm tool cache. Version resolution, platform detection, the cache, the download, the checksum, the cosign verification and the `$GITHUB_PATH` step had no coverage at all: `action-smoke` drives `scripts/action/run.sh` with a locally built binary and skips every one of them, so that half of the Action only ever ran in other people's workflows.
+- Acceptance tests for `resolve-version.sh` covering the whole precedence chain, including the two branches that decide what gets downloaded when nothing is pinned.
+- The GPG public key is published at <https://jtprogru.github.io/notiflow/notiflow-signing-key.asc> and its fingerprint is in the installation docs. Both locales documented `gpg --verify` without ever saying where the key comes from, which leaves the reader with a `no public key` error and nothing to compare against.
+
+### Changed
+
+- `cargo publish` runs after the GitHub release rather than beside it, and skips a version already on crates.io. A crate version cannot be unpublished, so it belongs last, and a re-run of a partially failed release should not go red on the one step that did succeed.
+- The Homebrew job runs on pre-release tags too, generating the formula and stopping before the push. The tap checkout, the token, the GPG import and the rendered formula are now something a release candidate proves rather than something the stable tag attempts for the first time.
+- `lib.rs` states what semver covers: the CLI and the Action. The library is `pub` for the binary's and the tests' benefit, has no external consumer, and its items can change in a minor release.
+- The README no longer promises GPG signatures unconditionally, matching the correction already made to the installation page.
+
 ## [2.0.0-alpha.2] — 2026-08-11
 
 Same code as `2.0.0-alpha.1`, which never produced a GitHub Release: the release workflow built and signed every artefact, published the crate, and then aborted importing a GPG key this repository does not hold. `2.0.0-alpha.1` exists on crates.io and nowhere else.
