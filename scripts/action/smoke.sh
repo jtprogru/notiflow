@@ -15,13 +15,15 @@ export NF_BIN="${NF_BIN:-notiflow}"
 tmp="$(mktemp -d)"
 port_file="${tmp}/port"
 log_file="${tmp}/requests.log"
+err_file="${tmp}/mock.err"
 : >"$port_file"
+: >"$err_file"
 
 python3 "${ROOT}/tests/mock_server.py" \
   --responses "200:success" \
   --log "$log_file" \
   --port-file "$port_file" \
-  --pid-file "${tmp}/pid" &
+  --pid-file "${tmp}/pid" 2>"$err_file" &
 mock_pid=$!
 
 cleanup() {
@@ -31,18 +33,40 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for _ in $(seq 1 200); do
-  [ -s "$port_file" ] && break
-  kill -0 "$mock_pid" 2>/dev/null || {
-    echo "mock server died before binding" >&2
-    exit 1
-  }
-  sleep 0.1
-done
-[ -s "$port_file" ] || {
-  echo "mock server never bound a port" >&2
-  exit 1
+# Say why, not just that. "mock server never bound a port" on its own is undiagnosable from
+# a CI log, which is the same hole v1.6.2 closed in the bats helpers.
+mock_diagnostics() {
+  {
+    echo "--- mock server diagnostics ---"
+    echo "python3: $(command -v python3 || echo '<not on PATH>')"
+    python3 -V 2>&1 || true
+    if kill -0 "$mock_pid" 2>/dev/null; then
+      echo "process ${mock_pid}: alive"
+    else
+      echo "process ${mock_pid}: gone"
+    fi
+    echo "port file: $(wc -c <"$port_file" | tr -d ' ') byte(s)"
+    echo "--- mock stderr ---"
+    cat "$err_file" 2>/dev/null
+    echo "--- end ---"
+  } >&2
 }
+
+# 30s: interpreter startup on a cold runner is slower than on a warm laptop, and a timeout
+# here fails the job for the wrong reason.
+waited=0
+while [ "$waited" -lt 300 ]; do
+  [ -s "$port_file" ] && break
+  kill -0 "$mock_pid" 2>/dev/null || break
+  sleep 0.1
+  waited=$((waited + 1))
+done
+
+if [ ! -s "$port_file" ]; then
+  echo "mock server never bound a port after $((waited / 10))s" >&2
+  mock_diagnostics
+  exit 1
+fi
 
 export GITHUB_OUTPUT="${tmp}/gh_output"
 export GITHUB_STEP_SUMMARY="${tmp}/gh_summary"
