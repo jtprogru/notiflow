@@ -109,18 +109,24 @@ outputs:
 runs:
   using: composite
   steps:
+    # Every `run:` below reaches the action's own tree through $GITHUB_ACTION_PATH rather
+    # than ${{ github.action_path }}. The expression is substituted into the script text
+    # before bash parses it, and on a Windows runner its value is `D:\a\notiflow\notiflow`,
+    # whose backslashes bash then eats as escapes: the command becomes `D:anotiflownotiflow`
+    # and exits 127. The environment variable holds the same string but is never re-parsed.
+    # Same reasoning for $RUNNER_TOOL_CACHE.
     - name: Resolve notiflow version
       id: ver
       shell: bash
       env:
         INPUT_VERSION: ${{ inputs.version }}
         GH_TOKEN: ${{ inputs.github_token }}
-      run: ${{ github.action_path }}/scripts/action/resolve-version.sh
+      run: "$GITHUB_ACTION_PATH/scripts/action/resolve-version.sh"
 
     - name: Detect runner platform
       id: plat
       shell: bash
-      run: ${{ github.action_path }}/scripts/action/detect-platform.sh
+      run: "$GITHUB_ACTION_PATH/scripts/action/detect-platform.sh"
 
     - name: Restore notiflow binary cache
       id: cache
@@ -139,11 +145,13 @@ runs:
         BINARY: ${{ steps.plat.outputs.binary }}
         DEST: ${{ runner.tool_cache }}/notiflow/${{ steps.ver.outputs.version }}/${{ steps.plat.outputs.target }}
         VERIFY_SIGNATURE: ${{ inputs.verify_signature }}
-      run: ${{ github.action_path }}/scripts/action/install.sh
+      run: "$GITHUB_ACTION_PATH/scripts/action/install.sh"
 
     - name: Add notiflow to PATH
       shell: bash
-      run: echo "${{ runner.tool_cache }}/notiflow/${{ steps.ver.outputs.version }}/${{ steps.plat.outputs.target }}" >> "$GITHUB_PATH"
+      env:
+        DEST: ${{ runner.tool_cache }}/notiflow/${{ steps.ver.outputs.version }}/${{ steps.plat.outputs.target }}
+      run: echo "$DEST" >>"$GITHUB_PATH"
 
     - name: Send notification
       id: notiflow
@@ -165,4 +173,4 @@ runs:
         NF_MESSAGE_THREAD_ID: ${{ inputs.message_thread_id }}
         NF_FAIL_ON_ERROR: ${{ inputs.fail_on_error }}
         NF_EDIT_MESSAGE_ID: ${{ inputs.edit_message_id }}
-      run: ${{ github.action_path }}/scripts/action/run.sh
+      run: "$GITHUB_ACTION_PATH/scripts/action/run.sh"
