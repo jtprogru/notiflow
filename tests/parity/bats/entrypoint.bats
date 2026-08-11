@@ -20,7 +20,7 @@ teardown() {
 @test "entrypoint: happy path 200 sets outputs and exits 0" {
   mock_telegram_start "200:success"
   export NF_STATUS="success"
-  run "${NF_ROOT}/scripts/entrypoint.sh"
+  run "${NF_V1}/entrypoint.sh"
   [ "$status" -eq 0 ]
   assert_output_eq ok true
   assert_output_eq message_id 42
@@ -33,7 +33,7 @@ teardown() {
   mock_telegram_start "200:success"
   export NF_STATUS="success"
   export NF_NOTIFY_ON="failure,cancelled"
-  run "${NF_ROOT}/scripts/entrypoint.sh"
+  run "${NF_V1}/entrypoint.sh"
   [ "$status" -eq 0 ]
   assert_output_eq ok false
   assert_output_eq http_status 0
@@ -45,7 +45,7 @@ teardown() {
   mock_telegram_start "200:success"
   export NF_STATUS="skipped"
   export NF_NOTIFY_ON="any"
-  run "${NF_ROOT}/scripts/entrypoint.sh"
+  run "${NF_V1}/entrypoint.sh"
   [ "$status" -eq 0 ]
   [ "$(count_mock_requests)" -eq 1 ]
   assert_output_eq ok true
@@ -54,7 +54,7 @@ teardown() {
 @test "entrypoint: fail_on_error=true exits non-zero on 400 (REQ-7.4, CP-13)" {
   mock_telegram_start "400:bad_request"
   export NF_STATUS="failure" NF_FAIL_ON_ERROR="true"
-  run "${NF_ROOT}/scripts/entrypoint.sh"
+  run "${NF_V1}/entrypoint.sh"
   [ "$status" -ne 0 ]
   assert_output_eq ok false
   assert_output_eq http_status 400
@@ -63,7 +63,7 @@ teardown() {
 @test "entrypoint: fail_on_error=false exits 0 on 400 (REQ-7.5, CP-13)" {
   mock_telegram_start "400:bad_request"
   export NF_STATUS="failure" NF_FAIL_ON_ERROR="false"
-  run "${NF_ROOT}/scripts/entrypoint.sh"
+  run "${NF_V1}/entrypoint.sh"
   [ "$status" -eq 0 ]
   assert_output_eq ok false
   assert_output_eq http_status 400
@@ -77,7 +77,7 @@ teardown() {
   mock_telegram_start "200:success"
   unset NF_STATUS
   export JOB_STATUS="success"
-  run "${NF_ROOT}/scripts/entrypoint.sh"
+  run "${NF_V1}/entrypoint.sh"
   [ "$status" -eq 10 ]
   [ "$(count_mock_requests)" -eq 0 ]
   [[ "$output" == *"MISSING_REQUIRED_INPUT"* ]]
@@ -87,7 +87,7 @@ teardown() {
   # Static invariant: the add-mask directive must be emitted before any
   # require_command check, so a missing-dep failure can never leak the
   # token through whatever logged the failure.
-  local script="${NF_ROOT}/scripts/entrypoint.sh"
+  local script="${NF_V1}/entrypoint.sh"
   local mask_line first_req_line
   mask_line=$(awk '/^[^#]*nf::mask /{print NR; exit}' "$script")
   first_req_line=$(awk '/^[^#]*nf::require_command/{print NR; exit}' "$script")
@@ -102,7 +102,7 @@ teardown() {
 @test "entrypoint: token only appears in mask directive (CP-11)" {
   mock_telegram_start "500:server_error,500:server_error,500:server_error,500:server_error"
   export NF_STATUS="failure"
-  run "${NF_ROOT}/scripts/entrypoint.sh"
+  run "${NF_V1}/entrypoint.sh"
   # The single legitimate occurrence is the ::add-mask:: directive that
   # tells GitHub Actions to redact the token in subsequent logs. Anywhere
   # else (request URLs, error bodies, warnings) is a leak.

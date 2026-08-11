@@ -2,7 +2,9 @@
 # Shared bats helpers for notiflow tests.
 
 # Repository root, derived from this file's location.
-NF_ROOT="${BATS_TEST_DIRNAME%/tests}"
+NF_ROOT="${BATS_TEST_DIRNAME%/tests/parity/bats}"
+# Frozen v1 bash implementation, kept as the parity reference.
+NF_V1="${BATS_TEST_DIRNAME%/bats}/v1"
 NF_TMP="${BATS_TEST_TMPDIR:-/tmp}/nf"
 
 setup_clean_env() {
@@ -43,7 +45,7 @@ mock_telegram_start() {
   : >"$port_file"
   : >"$err_file"
 
-  python3 "${NF_ROOT}/tests/fixtures/mock_server.py" \
+  python3 "${NF_ROOT}/tests/mock_server.py" \
     --responses "$responses" \
     --log "$NF_MOCK_REQ_LOG" \
     --port-file "$port_file" \

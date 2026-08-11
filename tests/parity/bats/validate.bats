@@ -10,8 +10,8 @@ run_validate() {
   # Invoke validate in a clean subshell so exits don't terminate bats.
   bash -c '
     set -e
-    source "'"${NF_ROOT}"'/scripts/lib.sh"
-    source "'"${NF_ROOT}"'/scripts/validate.sh"
+    source "'"${NF_V1}"'/lib.sh"
+    source "'"${NF_V1}"'/validate.sh"
     nf::validate
     # print resolved values for inspection
     printf "NF_STATUS=%s\n"     "$NF_STATUS"

@@ -4,18 +4,18 @@ load helpers
 
 setup() {
   setup_clean_env
-  # shellcheck source=../scripts/lib.sh
-  source "${NF_ROOT}/scripts/lib.sh"
+  # shellcheck source=../v1/lib.sh
+  source "${NF_V1}/lib.sh"
 }
 
 @test "lib: nf::log writes to stderr" {
-  run bash -c 'source "'"${NF_ROOT}"'/scripts/lib.sh"; nf::log info hello 2>/tmp/nf_log_err; cat /tmp/nf_log_err'
+  run bash -c 'source "'"${NF_V1}"'/lib.sh"; nf::log info hello 2>/tmp/nf_log_err; cat /tmp/nf_log_err'
   [ "$status" -eq 0 ]
   [[ "$output" == *"::notice::hello"* ]]
 }
 
 @test "lib: nf::mask prints add-mask directive" {
-  run bash -c 'source "'"${NF_ROOT}"'/scripts/lib.sh"; nf::mask secret_value'
+  run bash -c 'source "'"${NF_V1}"'/lib.sh"; nf::mask secret_value'
   [ "$status" -eq 0 ]
   [ "$output" = "::add-mask::secret_value" ]
 }
@@ -24,7 +24,7 @@ setup() {
   GITHUB_OUTPUT="${BATS_TEST_TMPDIR}/out"
   : >"$GITHUB_OUTPUT"
   export GITHUB_OUTPUT
-  run bash -c 'source "'"${NF_ROOT}"'/scripts/lib.sh"; nf::set_output ok true; nf::set_output count 7'
+  run bash -c 'source "'"${NF_V1}"'/lib.sh"; nf::set_output ok true; nf::set_output count 7'
   [ "$status" -eq 0 ]
   grep -qx 'ok=true' "$GITHUB_OUTPUT"
   grep -qx 'count=7' "$GITHUB_OUTPUT"
@@ -36,7 +36,7 @@ setup() {
 }
 
 @test "lib: nf::require_command exits 22 on missing tool" {
-  run bash -c 'source "'"${NF_ROOT}"'/scripts/lib.sh"; nf::require_command definitely_not_a_real_command_xyz'
+  run bash -c 'source "'"${NF_V1}"'/lib.sh"; nf::require_command definitely_not_a_real_command_xyz'
   [ "$status" -eq 22 ]
   [[ "$output" == *"MISSING_DEPENDENCY:definitely_not_a_real_command_xyz"* ]]
 }

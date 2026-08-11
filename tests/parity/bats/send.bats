@@ -9,10 +9,10 @@ setup() {
   export NF_PARSE_MODE="MarkdownV2"
   export NF_DISABLE_WEB_PAGE_PREVIEW="true"
   export NF_DISABLE_NOTIFICATION="false"
-  # shellcheck source=../scripts/lib.sh
-  source "${NF_ROOT}/scripts/lib.sh"
-  # shellcheck source=../scripts/send.sh
-  source "${NF_ROOT}/scripts/send.sh"
+  # shellcheck source=../v1/lib.sh
+  source "${NF_V1}/lib.sh"
+  # shellcheck source=../v1/send.sh
+  source "${NF_V1}/send.sh"
 }
 
 teardown() {
