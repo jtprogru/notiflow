@@ -1,5 +1,5 @@
 name: 'notiflow — Telegram CI Notifier'
-description: 'Send a Telegram message when a workflow job completes. Customizable message format, retry on rate limits.'
+description: 'Send a Telegram message when a workflow job completes. Templates, retries, and a matching CLI.'
 author: 'jtprogru'
 
 branding:
@@ -11,26 +11,28 @@ inputs:
     description: 'Telegram bot token (use a repository secret).'
     required: true
   chat_id:
-    description: 'Target chat ID (integer, possibly negative) or @channel_username.'
+    description: >-
+      Target chat: an integer id (possibly negative) or @channelusername.
+      Exactly one chat — the comma-separated form accepted by v1.5 was removed in v2.
+      To notify several chats, use a job matrix or repeat the step.
     required: true
   status:
     description: >-
-      Job status to report. Must be passed explicitly from the workflow,
-      typically from the job.status or needs.<job>.result expression.
-      Allowed values: success, failure, cancelled, skipped.
-      Cannot be defaulted from job.status here — composite-action input
-      defaults do not have access to the job context.
+      Job status to report. Must be passed explicitly from the workflow, typically from
+      the job.status or needs.<job>.result expression. Allowed values: success, failure,
+      cancelled, skipped. Cannot be defaulted here — composite-action input defaults do
+      not have access to the job context.
     required: true
   parse_mode:
     description: 'Telegram parse_mode: MarkdownV2 (default), HTML, Markdown, or none.'
     required: false
     default: 'MarkdownV2'
   notify_on:
-    description: 'Comma-separated list of statuses that should trigger a notification.'
+    description: 'Comma-separated list of statuses that should trigger a notification. `any` or `all` means every status.'
     required: false
     default: 'success,failure,cancelled'
   message:
-    description: 'Verbatim message text. Overrides every template. No placeholder substitution applied.'
+    description: 'Verbatim message text. Overrides every template. No placeholder substitution and no escaping are applied.'
     required: false
     default: ''
   message_template:
@@ -54,7 +56,7 @@ inputs:
     required: false
     default: ''
   disable_web_page_preview:
-    description: 'Suppress link previews in the Telegram message.'
+    description: 'Suppress link previews. Sent as link_preview_options.is_disabled; the flat field Telegram deprecated is no longer used.'
     required: false
     default: 'true'
   disable_notification:
@@ -71,33 +73,80 @@ inputs:
     default: 'false'
   edit_message_id:
     description: >-
-      If set, the message is edited via editMessageText instead of sent fresh.
-      Accepts an integer for single-chat, or a comma-separated list whose length
-      must match chat_id for multi-chat (paired by index). Typically wired from
-      the message_id output of a previous notiflow step — see the README for a
-      worked example. disable_notification and message_thread_id are silently
-      dropped when editing (Telegram rejects them on edit).
+      If set, the message is edited via editMessageText instead of sent fresh. One integer,
+      typically wired from the message_id output of an earlier notiflow step.
+      disable_notification and message_thread_id are dropped when editing, because Telegram
+      rejects them there.
     required: false
     default: ''
+  version:
+    description: 'notiflow release to install. Empty pins to the version stamped in the Action tree; "latest" resolves the newest release at run time.'
+    required: false
+    default: ''
+  verify_signature:
+    description: 'Verify the release archive with cosign before installing. Requires sigstore/cosign-installer earlier in the job.'
+    required: false
+    default: 'false'
+  github_token:
+    description: 'Token used to call the GitHub Releases API when resolving "latest".'
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   ok:
     description: 'true when the message was delivered, false otherwise.'
     value: ${{ steps.notiflow.outputs.ok }}
   message_id:
-    description: 'Telegram message_id on success, empty otherwise.'
+    description: 'Telegram message_id on success, empty otherwise. A single value — v1 returned a comma-separated list for multi-chat sends.'
     value: ${{ steps.notiflow.outputs.message_id }}
   http_status:
-    description: 'Last HTTP status received from Telegram (0 for skipped/network error).'
+    description: 'HTTP status of the last attempt (0 when skipped or when no response arrived).'
     value: ${{ steps.notiflow.outputs.http_status }}
   error:
-    description: 'Error description on failure — Telegram .description when available, otherwise a synthesized reason (HTTP code, network error, exhausted retries). Empty on success and on skip.'
+    description: 'Failure reason — Telegram .description when available, otherwise a synthesized reason. Empty on success and on skip.'
     value: ${{ steps.notiflow.outputs.error }}
 
 runs:
   using: composite
   steps:
-    - id: notiflow
+    - name: Resolve notiflow version
+      id: ver
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ inputs.github_token }}
+      run: ${{ github.action_path }}/scripts/action/resolve-version.sh
+
+    - name: Detect runner platform
+      id: plat
+      shell: bash
+      run: ${{ github.action_path }}/scripts/action/detect-platform.sh
+
+    - name: Restore notiflow binary cache
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.tool_cache }}/notiflow/${{ steps.ver.outputs.version }}/${{ steps.plat.outputs.target }}
+        key: notiflow-${{ steps.ver.outputs.version }}-${{ steps.plat.outputs.target }}
+
+    - name: Install notiflow
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERSION: ${{ steps.ver.outputs.version }}
+        TARGET: ${{ steps.plat.outputs.target }}
+        EXT: ${{ steps.plat.outputs.ext }}
+        BINARY: ${{ steps.plat.outputs.binary }}
+        DEST: ${{ runner.tool_cache }}/notiflow/${{ steps.ver.outputs.version }}/${{ steps.plat.outputs.target }}
+        VERIFY_SIGNATURE: ${{ inputs.verify_signature }}
+      run: ${{ github.action_path }}/scripts/action/install.sh
+
+    - name: Add notiflow to PATH
+      shell: bash
+      run: echo "${{ runner.tool_cache }}/notiflow/${{ steps.ver.outputs.version }}/${{ steps.plat.outputs.target }}" >> "$GITHUB_PATH"
+
+    - name: Send notification
+      id: notiflow
       shell: bash
       env:
         NF_BOT_TOKEN: ${{ inputs.bot_token }}
@@ -116,5 +165,4 @@ runs:
         NF_MESSAGE_THREAD_ID: ${{ inputs.message_thread_id }}
         NF_FAIL_ON_ERROR: ${{ inputs.fail_on_error }}
         NF_EDIT_MESSAGE_ID: ${{ inputs.edit_message_id }}
-      run: |
-        bash "${{ github.action_path }}/scripts/entrypoint.sh"
+      run: ${{ github.action_path }}/scripts/action/run.sh
