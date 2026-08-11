@@ -4,24 +4,24 @@ load helpers
 
 setup() {
   setup_clean_env
-  # shellcheck source=../scripts/lib.sh
-  source "${NF_ROOT}/scripts/lib.sh"
-  # shellcheck source=../scripts/filter.sh
-  source "${NF_ROOT}/scripts/filter.sh"
+  # shellcheck source=../v1/lib.sh
+  source "${NF_V1}/lib.sh"
+  # shellcheck source=../v1/filter.sh
+  source "${NF_V1}/filter.sh"
 }
 
 @test "filter: status in list returns 0" {
-  run bash -c 'source "'"${NF_ROOT}"'/scripts/lib.sh"; source "'"${NF_ROOT}"'/scripts/filter.sh"; nf::should_notify failure "success,failure"'
+  run bash -c 'source "'"${NF_V1}"'/lib.sh"; source "'"${NF_V1}"'/filter.sh"; nf::should_notify failure "success,failure"'
   [ "$status" -eq 0 ]
 }
 
 @test "filter: status not in list returns 1" {
-  run bash -c 'source "'"${NF_ROOT}"'/scripts/lib.sh"; source "'"${NF_ROOT}"'/scripts/filter.sh"; nf::should_notify success "failure"'
+  run bash -c 'source "'"${NF_V1}"'/lib.sh"; source "'"${NF_V1}"'/filter.sh"; nf::should_notify success "failure"'
   [ "$status" -eq 1 ]
 }
 
 @test "filter: whitespace tolerated" {
-  run bash -c 'source "'"${NF_ROOT}"'/scripts/lib.sh"; source "'"${NF_ROOT}"'/scripts/filter.sh"; nf::should_notify success " success , failure "'
+  run bash -c 'source "'"${NF_V1}"'/lib.sh"; source "'"${NF_V1}"'/filter.sh"; nf::should_notify success " success , failure "'
   [ "$status" -eq 0 ]
 }
 
@@ -39,8 +39,8 @@ setup() {
         *) expected=1 ;;
       esac
       bash -c '
-        source "'"${NF_ROOT}"'/scripts/lib.sh"
-        source "'"${NF_ROOT}"'/scripts/filter.sh"
+        source "'"${NF_V1}"'/lib.sh"
+        source "'"${NF_V1}"'/filter.sh"
         nf::should_notify "'"$st"'" "'"$lst"'"
       ' && actual=0 || actual=$?
       if [ "$actual" -ne "$expected" ]; then

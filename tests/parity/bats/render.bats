@@ -4,12 +4,12 @@ load helpers
 
 setup() {
   setup_clean_env
-  # shellcheck source=../scripts/lib.sh
-  source "${NF_ROOT}/scripts/lib.sh"
-  # shellcheck source=../scripts/escape.sh
-  source "${NF_ROOT}/scripts/escape.sh"
-  # shellcheck source=../scripts/render.sh
-  source "${NF_ROOT}/scripts/render.sh"
+  # shellcheck source=../v1/lib.sh
+  source "${NF_V1}/lib.sh"
+  # shellcheck source=../v1/escape.sh
+  source "${NF_V1}/escape.sh"
+  # shellcheck source=../v1/render.sh
+  source "${NF_V1}/render.sh"
 }
 
 @test "render: NF_MESSAGE returned verbatim (REQ-5.1)" {
