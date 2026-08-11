@@ -1,7 +1,13 @@
+/target/
 *.log
 tmp/
+dist/
 .bats-tmp/
 *.bak
 node_modules/
 coverage/
 tests/.tmp/
+docs/.astro/
+docs/dist/
+docs/node_modules/
+*.pending-snap

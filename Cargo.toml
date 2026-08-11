@@ -1,0 +1,52 @@
+[package]
+name = "notiflow"
+version = "2.0.0-alpha.1"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Mikhail Savin <jtprogru@gmail.com>"]
+description = "Telegram notifier for CI and the terminal — a GitHub Action and a standalone CLI in one binary"
+license = "MIT"
+repository = "https://github.com/jtprogru/notiflow"
+homepage = "https://jtprogru.github.io/notiflow/"
+documentation = "https://docs.rs/notiflow"
+readme = "README.md"
+keywords = ["telegram", "notification", "github-action", "cli", "ci"]
+categories = ["command-line-utilities"]
+exclude = [
+    ".github/",
+    ".gitignore",
+    "docs/",
+    "tests/",
+    "scripts/",
+    "plans/",
+    "action.yml",
+]
+
+[lib]
+name = "notiflow"
+path = "src/lib.rs"
+
+[[bin]]
+name = "notiflow"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "env", "wrap_help"] }
+clap_complete = "4.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+toml = "0.9"
+ureq = { version = "3", default-features = false, features = ["rustls", "json", "gzip"] }
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tiny_http = "0.12"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
