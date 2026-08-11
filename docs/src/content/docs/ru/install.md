@@ -94,9 +94,16 @@ cosign verify-blob "notiflow-${TARGET}.tar.gz" \
 gh attestation verify "notiflow-${TARGET}.tar.gz" --repo jtprogru/notiflow
 ```
 
-Релиз может дополнительно нести отсоединённые GPG-подписи (файлы `.asc` рядом с
-артефактами). Они появляются, только если для релизного workflow настроен ключ, — так что
-проверь наличие файла, прежде чем на него полагаться. Всегда есть cosign и attestation.
+Релизы начиная с `v2.0.0` дополнительно несут отсоединённые GPG-подписи (файлы `.asc`
+рядом с артефактами), сделанные ключом мейнтейнера:
+
+```bash
+curl -fsSLO "${BASE}/notiflow-${TARGET}.tar.gz.asc"
+gpg --verify "notiflow-${TARGET}.tar.gz.asc" "notiflow-${TARGET}.tar.gz"
+```
+
+Пре-релизы `2.0.0-alpha.1` и `2.0.0-alpha.2` старше ключа, `.asc` у них нет. cosign и
+attestation есть у всех релизов, включая эти два.
 
 ## Автодополнения
 
