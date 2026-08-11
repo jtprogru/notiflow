@@ -204,11 +204,17 @@ version-check: ## Verify Cargo.toml and VERSION agree with a tag (make version-c
 .PHONY: release-prep
 release-prep: ## Stamp a version into Cargo.toml and VERSION (make release-prep VERSION=2.0.0)
 	@test -n "$(VERSION)" || { echo "usage: make release-prep VERSION=X.Y.Z"; exit 1; }
+	@# `0,/re/` is a GNU sed extension that BSD sed silently ignores, so the macOS run of
+	@# this target used to leave Cargo.toml untouched and say it had stamped it. Python
+	@# does the edit, and the target verifies its own work rather than trusting it.
 	@v="$(VERSION)"; v="$${v#v}"; \
-	 sed -i.bak -E '0,/^version = /s//version = "'"$$v"'"/' Cargo.toml && rm -f Cargo.toml.bak; \
+	 python3 -c 'import re,sys,pathlib; p=pathlib.Path("Cargo.toml"); s=p.read_text(); \
+s2,n=re.subn(r"^version = \"[^\"]*\"", "version = \"%s\"" % sys.argv[1], s, count=1, flags=re.M); \
+sys.exit("Cargo.toml: no version line found") if n != 1 else p.write_text(s2)' "$$v"; \
 	 printf 'v%s\n' "$$v" > VERSION; \
 	 $(CARGO) update --workspace --quiet; \
-	 echo "stamped $$v — now update CHANGELOG.md, commit, and tag v$$v"
+	 $(MAKE) --no-print-directory version-check TAG="v$$v"; \
+	 echo "now update CHANGELOG.md, commit, and tag v$$v"
 
 .PHONY: checksums
 checksums: ## Write dist/checksums.txt for whatever is in dist/
