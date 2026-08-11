@@ -289,7 +289,7 @@
   {
     "id": "render-truncate-emoji",
     "kind": "render",
-    "why": "Cutting a run of surrogate pairs. The corpus found a v1 defect the plan had not listed: BSD iconv exits 1 on a trailing incomplete character even under -c, so on macOS v1 aborts inside _nf::_truncate, drops the ellipsis, and — with set -e in the real entrypoint — fails the whole send. v2 cuts on a character boundary and never produces a partial pair.",
+    "why": "Cutting a run of surrogate pairs. The corpus found a v1 defect the plan had not listed: iconv exits 1 on a trailing incomplete character even under -c, on BSD and GNU alike, so v1 aborts inside _nf::_truncate, drops the ellipsis, and — with set -e in the real entrypoint — fails the whole send. Confirmed on both macOS and Linux. v2 cuts on a character boundary and never produces a partial pair.",
     "divergence": "fix: truncation no longer depends on iconv surviving a severed surrogate pair",
     "env": {
       "NF_PARSE_MODE": "none"

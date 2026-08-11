@@ -100,7 +100,9 @@ parity-bless: build ## Re-record the corpus expectations (review the diff before
 msrv: ## Verify the crate still builds on its minimum supported Rust version
 	@command -v rustup >/dev/null || { echo "rustup is required for the MSRV check"; exit 1; }
 	rustup toolchain install $(MSRV) --profile minimal --no-self-update
-	$(CARGO) +$(MSRV) check --all-targets --locked
+	# `rustup run`, not `cargo +$(MSRV)`: a Homebrew-installed cargo is not the rustup
+	# shim and rejects `+toolchain`, so the plain form only works on some machines.
+	rustup run $(MSRV) cargo check --all-targets --locked
 
 .PHONY: audit
 audit: ## Check dependencies against the RustSec advisory database

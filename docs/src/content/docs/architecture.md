@@ -94,9 +94,9 @@ A case may declare a `divergence` with a reason. A v2 result that differs *witho
 fails the build — the corpus distinguishes a fix from a regression, and forces the
 difference to be written down at the moment it is introduced.
 
-It paid for itself immediately: it caught a defect nobody had listed, where BSD `iconv`
-exits non-zero on a severed surrogate pair, so a long emoji-bearing message aborted v1's
-send on macOS.
+It paid for itself immediately: it caught a defect nobody had listed, where `iconv` exits
+non-zero on a severed surrogate pair, so a long emoji-bearing message aborted v1's send —
+on Linux as well as macOS, which only became clear once the corpus ran in CI.
 
 The v1 bash sources live on in `tests/parity/v1/`, with their original bats suite, so the
 reference implementation stays verified rather than assumed.

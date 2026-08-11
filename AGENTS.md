@@ -102,6 +102,14 @@ value is that it does not change.
 Rust: `rustfmt` with the repository's `rustfmt.toml`, `clippy -D warnings`. Edition 2024,
 MSRV 1.85 — `make msrv` is the check, and let-chains are therefore off limits.
 
+`Cargo.lock` may pin a crate whose own `rust-version` exceeds our MSRV, and that is fine as
+long as the crate is not compiled. The lockfile is feature-agnostic: it records optional
+dependencies even when no enabled feature pulls them in. `time` is the current example — it
+arrives through `ureq`'s `cookies` feature, which we do not enable, so `cargo tree` cannot
+see it while `cargo audit`, which scans the lockfile rather than the build graph, can. Keep
+such entries updated anyway; an advisory that cannot reach the binary today can reach it
+after one feature change, and a suppressed finding is one nobody looks at again.
+
 Comments explain why, not what. A comment that restates the line below it is noise; a
 comment that records why a non-obvious choice was made is the reason the file is
 maintainable. Several already-fixed defects are documented in place — leave them there.
