@@ -1,0 +1,164 @@
+[
+  {
+    "id": "request-basic",
+    "kind": "request",
+    "why": "The default send body.",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_MESSAGE": "hello"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"disable_web_page_preview\": true, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"link_preview_options\": {\"is_disabled\": true}, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    }
+  },
+  {
+    "id": "request-numeric-chat-id",
+    "kind": "request",
+    "why": "A numeric chat id goes on the wire as a JSON number, not a string.",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_CHAT_ID": "-1001234567890",
+      "NF_MESSAGE": "hello"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"disable_web_page_preview\": true, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"link_preview_options\": {\"is_disabled\": true}, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    }
+  },
+  {
+    "id": "request-username-chat-id",
+    "kind": "request",
+    "why": "A @username chat id stays a JSON string.",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_CHAT_ID": "@my_channel",
+      "NF_MESSAGE": "hello"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": \"@my_channel\", \"disable_notification\": false, \"disable_web_page_preview\": true, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": \"@my_channel\", \"disable_notification\": false, \"link_preview_options\": {\"is_disabled\": true}, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    }
+  },
+  {
+    "id": "request-thread-id",
+    "kind": "request",
+    "why": "A forum topic id is included on send.",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_MESSAGE_THREAD_ID": "7",
+      "NF_MESSAGE": "hello"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"disable_web_page_preview\": true, \"message_thread_id\": 7, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"link_preview_options\": {\"is_disabled\": true}, \"message_thread_id\": 7, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    }
+  },
+  {
+    "id": "request-silent",
+    "kind": "request",
+    "why": "disable_notification is carried through.",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_DISABLE_NOTIFICATION": "true",
+      "NF_MESSAGE": "hello"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": true, \"disable_web_page_preview\": true, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": true, \"link_preview_options\": {\"is_disabled\": true}, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    }
+  },
+  {
+    "id": "request-preview-enabled",
+    "kind": "request",
+    "why": "Link previews turned back on.",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_DISABLE_WEB_PAGE_PREVIEW": "false",
+      "NF_MESSAGE": "hello"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"disable_web_page_preview\": false, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"link_preview_options\": {\"is_disabled\": false}, \"parse_mode\": \"MarkdownV2\", \"text\": \"hello\"}"
+    }
+  },
+  {
+    "id": "request-parse-mode-none",
+    "kind": "request",
+    "why": "parse_mode is omitted entirely rather than sent as the string \"none\".",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_PARSE_MODE": "none",
+      "NF_MESSAGE": "hello"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"disable_web_page_preview\": true, \"text\": \"hello\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"link_preview_options\": {\"is_disabled\": true}, \"text\": \"hello\"}"
+    }
+  },
+  {
+    "id": "request-edit-drops-notification-and-thread",
+    "kind": "request",
+    "why": "Telegram rejects disable_notification and message_thread_id on editMessageText, so both are dropped.",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_EDIT_MESSAGE_ID": "42",
+      "NF_MESSAGE_THREAD_ID": "7",
+      "NF_DISABLE_NOTIFICATION": "true",
+      "NF_MESSAGE": "edited"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_web_page_preview\": true, \"message_id\": 42, \"parse_mode\": \"MarkdownV2\", \"text\": \"edited\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"link_preview_options\": {\"is_disabled\": true}, \"message_id\": 42, \"parse_mode\": \"MarkdownV2\", \"text\": \"edited\"}"
+    }
+  },
+  {
+    "id": "request-escapes-json-correctly",
+    "kind": "request",
+    "why": "Quotes, backslashes and newlines in the body must survive JSON encoding.",
+    "divergence": "fix: disable_web_page_preview replaced by link_preview_options (plan 2.2.7)",
+    "env": {
+      "NF_MESSAGE": "quote\" backslash\\ newline\ntab\tend"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"disable_web_page_preview\": true, \"parse_mode\": \"MarkdownV2\", \"text\": \"quote\\\" backslash\\\\ newline\\ntab\\tend\"}"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{\"chat_id\": -1001234567890, \"disable_notification\": false, \"link_preview_options\": {\"is_disabled\": true}, \"parse_mode\": \"MarkdownV2\", \"text\": \"quote\\\" backslash\\\\ newline\\ntab\\tend\"}"
+    }
+  }
+]
