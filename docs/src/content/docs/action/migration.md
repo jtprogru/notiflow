@@ -102,9 +102,10 @@ boundary, which could sever a MarkdownV2 escape pair (`\` + `.`), an HTML entity
 (`&amp;`) or a tag — Telegram answered 400 on a message whose only sin was being long.
 v2 cuts between markup tokens, and in HTML mode also closes tags left open by the cut.
 
-The same code path had a second failure on macOS: BSD `iconv` exits non-zero on a trailing
-incomplete character even with `-c`, so a long message ending mid-emoji aborted the send
-entirely. v2 has no `iconv`.
+The same code path had a second failure. `iconv` exits non-zero on a trailing incomplete
+character even with `-c` — BSD and GNU behave the same here — so any message over the limit
+whose cut landed inside a surrogate pair aborted the send entirely, on every platform.
+v2 has no `iconv`.
 
 ### The token is scrubbed from every stream
 
