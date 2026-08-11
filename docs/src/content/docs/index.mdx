@@ -2,6 +2,11 @@
 title: notiflow
 description: Telegram notifier for CI and the terminal — a GitHub Action and a standalone CLI in one binary.
 template: splash
+head:
+  # Starlight renders `<page title> | <site title>`, which for the landing page is
+  # "notiflow | notiflow". The visible h1 must stay "notiflow", so override just the tag.
+  - tag: title
+    content: notiflow — Telegram notifier for CI and the terminal
 hero:
   tagline: Tell Telegram when something finished. From a workflow, or from your shell.
   actions:
