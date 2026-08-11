@@ -1,0 +1,364 @@
+[
+  {
+    "id": "render-default-success",
+    "kind": "render",
+    "why": "The built-in template is what most users actually get; it must not shift by a byte.",
+    "env": {},
+    "expected_v1": {
+      "exit": 0,
+      "value": "✅ *CI* on `jtprogru/notiflow`\nStatus: success\nBranch: main @ abcdef0\nActor: tester\n[Open run](https://github\\.com/jtprogru/notiflow/actions/runs/1)"
+    }
+  },
+  {
+    "id": "render-default-failure",
+    "kind": "render",
+    "why": "Per-status emoji selection through the default template.",
+    "env": {
+      "NF_STATUS": "failure"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "❌ *CI* on `jtprogru/notiflow`\nStatus: failure\nBranch: main @ abcdef0\nActor: tester\n[Open run](https://github\\.com/jtprogru/notiflow/actions/runs/1)"
+    }
+  },
+  {
+    "id": "render-default-cancelled",
+    "kind": "render",
+    "why": "The cancelled emoji is a two-codepoint sequence and has bitten renderers before.",
+    "env": {
+      "NF_STATUS": "cancelled"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "⚠️ *CI* on `jtprogru/notiflow`\nStatus: cancelled\nBranch: main @ abcdef0\nActor: tester\n[Open run](https://github\\.com/jtprogru/notiflow/actions/runs/1)"
+    }
+  },
+  {
+    "id": "render-default-skipped",
+    "kind": "render",
+    "why": "skipped is outside the default notify_on, so the case has to widen it to render at all.",
+    "env": {
+      "NF_STATUS": "skipped",
+      "NF_NOTIFY_ON": "any"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "⏭ *CI* on `jtprogru/notiflow`\nStatus: skipped\nBranch: main @ abcdef0\nActor: tester\n[Open run](https://github\\.com/jtprogru/notiflow/actions/runs/1)"
+    }
+  },
+  {
+    "id": "render-message-verbatim",
+    "kind": "render",
+    "why": "message is passed through with no substitution and no escaping — the documented escape hatch.",
+    "env": {
+      "NF_MESSAGE": "*bold* _text_ with . dots and {{.Actor}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "*bold* _text_ with . dots and {{.Actor}}"
+    }
+  },
+  {
+    "id": "render-message-template",
+    "kind": "render",
+    "why": "The generic template path.",
+    "env": {
+      "NF_MESSAGE_TEMPLATE": "{{.Repo}} :: {{.Status}} :: {{.RunNumber}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "jtprogru/notiflow :: success :: 1"
+    }
+  },
+  {
+    "id": "render-per-status-beats-generic",
+    "kind": "render",
+    "why": "template_<status> outranks message_template.",
+    "env": {
+      "NF_STATUS": "failure",
+      "NF_MESSAGE_TEMPLATE": "generic {{.Status}}",
+      "NF_TEMPLATE_FAILURE": "specific {{.Status}} on {{.Branch}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "specific failure on main"
+    }
+  },
+  {
+    "id": "render-escape-markdownv2",
+    "kind": "render",
+    "why": "A branch name full of MarkdownV2 metacharacters must not become markup.",
+    "env": {
+      "GITHUB_REF_NAME": "fix/a.b-c_d[e](f)",
+      "NF_MESSAGE_TEMPLATE": "branch {{.Branch}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "branch fix/a\\.b\\-c\\_d\\[e\\]\\(f\\)"
+    }
+  },
+  {
+    "id": "render-escape-html",
+    "kind": "render",
+    "why": "HTML escaping of a workflow name that looks like markup.",
+    "env": {
+      "NF_PARSE_MODE": "HTML",
+      "GITHUB_WORKFLOW": "<b>a&b</b>",
+      "NF_MESSAGE_TEMPLATE": "wf {{.Workflow}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "wf &lt;b&gt;a&amp;b&lt;/b&gt;"
+    }
+  },
+  {
+    "id": "render-escape-none",
+    "kind": "render",
+    "why": "parse_mode=none escapes nothing at all.",
+    "env": {
+      "NF_PARSE_MODE": "none",
+      "GITHUB_WORKFLOW": "<b>a&b</b>",
+      "NF_MESSAGE_TEMPLATE": "wf {{.Workflow}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "wf <b>a&b</b>"
+    }
+  },
+  {
+    "id": "render-legacy-markdown-upgraded",
+    "kind": "render",
+    "why": "parse_mode=Markdown is an alias for MarkdownV2 and escapes per V2 rules.",
+    "env": {
+      "NF_PARSE_MODE": "Markdown",
+      "GITHUB_REF_NAME": "fix/a.b",
+      "NF_MESSAGE_TEMPLATE": "branch {{.Branch}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "branch fix/a\\.b"
+    }
+  },
+  {
+    "id": "render-unknown-placeholder-dropped",
+    "kind": "render",
+    "why": "An unknown placeholder is stripped, not left in the message.",
+    "env": {
+      "NF_MESSAGE_TEMPLATE": "a{{.Nope}}b{{.Nope}}c"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "abc"
+    }
+  },
+  {
+    "id": "render-malformed-braces-literal",
+    "kind": "render",
+    "why": "Text that only looks like a placeholder stays literal.",
+    "env": {
+      "NF_MESSAGE_TEMPLATE": "{{.}} {{.1Bad}} {{Repo}} {{.Repo}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "{{.}} {{.1Bad}} {{Repo}} {{.Repo}"
+    }
+  },
+  {
+    "id": "render-nested-placeholder-none",
+    "kind": "render",
+    "why": "A workflow name containing a placeholder. v1 substituted key by key, so the value was rescanned and expanded; v2 reads the template once.",
+    "divergence": "fix: single-pass substitution (plan 2.2.1)",
+    "env": {
+      "NF_PARSE_MODE": "none",
+      "GITHUB_WORKFLOW": "{{.Actor}}",
+      "NF_MESSAGE_TEMPLATE": "{{.Workflow}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "tester"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{{.Actor}}"
+    }
+  },
+  {
+    "id": "render-nested-placeholder-html",
+    "kind": "render",
+    "why": "Same defect under HTML, where escaping does not accidentally protect against it.",
+    "divergence": "fix: single-pass substitution (plan 2.2.1)",
+    "env": {
+      "NF_PARSE_MODE": "HTML",
+      "GITHUB_WORKFLOW": "{{.Actor}}",
+      "NF_MESSAGE_TEMPLATE": "{{.Workflow}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "tester"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "value": "{{.Actor}}"
+    }
+  },
+  {
+    "id": "render-nested-placeholder-markdownv2",
+    "kind": "render",
+    "why": "Under MarkdownV2 the braces get escaped before the next iteration could match them, so v1 accidentally behaved correctly here. Recorded to prove the fix did not change this case.",
+    "env": {
+      "GITHUB_WORKFLOW": "{{.Actor}}",
+      "NF_MESSAGE_TEMPLATE": "{{.Workflow}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "\\{\\{\\.Actor\\}\\}"
+    }
+  },
+  {
+    "id": "render-multiline-value",
+    "kind": "render",
+    "why": "Newlines inside a substituted value survive.",
+    "env": {
+      "GITHUB_WORKFLOW": "line one\nline two",
+      "NF_MESSAGE_TEMPLATE": "wf: {{.Workflow}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "wf: line one\nline two"
+    }
+  },
+  {
+    "id": "render-cyrillic",
+    "kind": "render",
+    "why": "Non-ASCII BMP text costs one UTF-16 unit per character and must pass through intact.",
+    "env": {
+      "GITHUB_WORKFLOW": "Сборка релиза",
+      "NF_MESSAGE_TEMPLATE": "wf: {{.Workflow}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "wf: Сборка релиза"
+    }
+  },
+  {
+    "id": "render-emoji",
+    "kind": "render",
+    "why": "Supplementary-plane characters cost two UTF-16 units.",
+    "env": {
+      "GITHUB_WORKFLOW": "build 🎉 done",
+      "NF_MESSAGE_TEMPLATE": "wf: {{.Workflow}}"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "wf: build 🎉 done"
+    }
+  },
+  {
+    "id": "render-empty-values",
+    "kind": "render",
+    "why": "A known placeholder with nothing behind it renders empty rather than failing.",
+    "env": {
+      "GITHUB_WORKFLOW": null,
+      "GITHUB_ACTOR": null,
+      "NF_MESSAGE_TEMPLATE": "[{{.Workflow}}][{{.Actor}}]"
+    },
+    "expected_v1": {
+      "exit": 0,
+      "value": "[][]"
+    }
+  },
+  {
+    "id": "render-truncate-plain",
+    "kind": "render",
+    "why": "Over the 4096-unit limit with nothing to break: both implementations must cut in the same place.",
+    "env": {
+      "NF_PARSE_MODE": "none"
+    },
+    "env_repeat": {
+      "NF_MESSAGE": {
+        "unit": "x",
+        "times": 5000
+      }
+    },
+    "expected_v1": {
+      "exit": 0,
+      "utf16_len": 4096,
+      "tail": "xxxxxxxxx..."
+    }
+  },
+  {
+    "id": "render-truncate-emoji",
+    "kind": "render",
+    "why": "Cutting a run of surrogate pairs. The corpus found a v1 defect the plan had not listed: BSD iconv exits 1 on a trailing incomplete character even under -c, so on macOS v1 aborts inside _nf::_truncate, drops the ellipsis, and — with set -e in the real entrypoint — fails the whole send. v2 cuts on a character boundary and never produces a partial pair.",
+    "divergence": "fix: truncation no longer depends on iconv surviving a severed surrogate pair",
+    "env": {
+      "NF_PARSE_MODE": "none"
+    },
+    "env_repeat": {
+      "NF_MESSAGE": {
+        "unit": "🎉",
+        "times": 3000
+      }
+    },
+    "expected_v1": {
+      "exit": 1,
+      "utf16_len": 4092,
+      "tail": "🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉"
+    },
+    "expected_v2": {
+      "exit": 0,
+      "utf16_len": 4095,
+      "tail": "🎉🎉🎉🎉🎉🎉🎉🎉🎉..."
+    }
+  },
+  {
+    "id": "render-truncate-markdown-escape-pair",
+    "kind": "render",
+    "why": "The boundary lands inside a backslash escape pair. v1 cut on a raw code-unit boundary and left a dangling backslash, which Telegram answers with 400; v2 cuts on a token boundary.",
+    "divergence": "fix: markup-safe truncation boundary (plan 2.2.2)",
+    "env": {
+      "NF_PARSE_MODE": "MarkdownV2"
+    },
+    "env_repeat": {
+      "NF_MESSAGE": {
+        "unit": "\\.",
+        "times": 2500
+      }
+    },
+    "expected_v1": {
+      "exit": 0,
+      "utf16_len": 4096,
+      "tail": "\\.\\.\\.\\.\\..."
+    },
+    "expected_v2": {
+      "exit": 0,
+      "utf16_len": 4095,
+      "tail": ".\\.\\.\\.\\...."
+    }
+  },
+  {
+    "id": "render-truncate-html-entity",
+    "kind": "render",
+    "why": "The boundary lands inside an HTML entity.",
+    "divergence": "fix: markup-safe truncation boundary (plan 2.2.2)",
+    "env": {
+      "NF_PARSE_MODE": "HTML"
+    },
+    "env_repeat": {
+      "NF_MESSAGE": {
+        "unit": "&amp;",
+        "times": 1000
+      }
+    },
+    "expected_v1": {
+      "exit": 0,
+      "utf16_len": 4096,
+      "tail": ";&amp;&am..."
+    },
+    "expected_v2": {
+      "exit": 0,
+      "utf16_len": 4093,
+      "tail": "amp;&amp;..."
+    }
+  }
+]

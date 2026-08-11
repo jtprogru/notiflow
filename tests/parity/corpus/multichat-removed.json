@@ -1,0 +1,75 @@
+[
+  {
+    "id": "multichat-two-chats-rejected",
+    "kind": "exit",
+    "why": "v1.5.0 accepted a comma-separated chat_id and fanned out. v2 sends to exactly one chat. The point of this case is that v2 fails loudly with 11 rather than quietly posting to a chat literally named '-100123,-100456'.",
+    "divergence": "breaking change: multi-chat fan-out removed (plan 2.1)",
+    "env": {
+      "NF_CHAT_ID": "-1001234567890,-1009876543210"
+    },
+    "expected_v1": {
+      "exit": 0
+    },
+    "expected_v2": {
+      "exit": 11
+    }
+  },
+  {
+    "id": "multichat-two-chats-with-spaces-rejected",
+    "kind": "exit",
+    "why": "The same, spelled with the whitespace v1 tolerated.",
+    "divergence": "breaking change: multi-chat fan-out removed (plan 2.1)",
+    "env": {
+      "NF_CHAT_ID": "-1001234567890, -1009876543210"
+    },
+    "expected_v1": {
+      "exit": 0
+    },
+    "expected_v2": {
+      "exit": 11
+    }
+  },
+  {
+    "id": "multichat-paired-edit-ids-rejected",
+    "kind": "exit",
+    "why": "v1 paired a CSV of edit_message_id with a CSV of chat_id by index. v2 rejects the chat_id first.",
+    "divergence": "breaking change: multi-chat fan-out removed (plan 2.1)",
+    "env": {
+      "NF_CHAT_ID": "-1001234567890,-1009876543210",
+      "NF_EDIT_MESSAGE_ID": "42,43"
+    },
+    "expected_v1": {
+      "exit": 0
+    },
+    "expected_v2": {
+      "exit": 11
+    }
+  },
+  {
+    "id": "multichat-edit-length-mismatch",
+    "kind": "exit",
+    "why": "v1 had a dedicated 16 for a CSV length mismatch. v2 has no CSV at all, so it stops at 11 on the chat_id.",
+    "divergence": "breaking change: multi-chat fan-out removed (plan 2.1)",
+    "env": {
+      "NF_CHAT_ID": "-1001234567890,-1009876543210",
+      "NF_EDIT_MESSAGE_ID": "42"
+    },
+    "expected_v1": {
+      "exit": 16
+    },
+    "expected_v2": {
+      "exit": 11
+    }
+  },
+  {
+    "id": "multichat-csv-edit-id-single-chat-rejected",
+    "kind": "exit",
+    "why": "A CSV edit_message_id against a single chat was a length mismatch in v1 and is a malformed id in v2. Different reasoning, same 16 — recorded so the agreement stays deliberate.",
+    "env": {
+      "NF_EDIT_MESSAGE_ID": "42,43"
+    },
+    "expected_v1": {
+      "exit": 16
+    }
+  }
+]
