@@ -11,15 +11,15 @@ Same code as `2.0.0-alpha.1`, which never produced a GitHub Release: the release
 - The release no longer depends on GPG. Importing and signing are conditional and log a `::warning::` when skipped; keyless cosign signatures and the SLSA provenance attestation are unconditional and unaffected. The release file list uses globs so an absent `.asc` is not a missing-file failure.
 - The Homebrew job is `continue-on-error`. The tap is a separate repository, and a token problem there should not retroactively fail a release whose artefacts are already published.
 - `make dist` and the Action's `install.sh` no longer assume `zip` and `unzip` exist. Neither ships with git-bash, which is the bash a Windows runner provides; both now fall back to 7-Zip and then PowerShell.
-- The test mock server no longer stalls in `server_bind`. `http.server` calls `socket.getfqdn()` on the address it binds, and a runner that cannot answer a reverse lookup for `127.0.0.1` blocks there until the DNS timeout — the socket is listening but the port file appears seconds later. This is almost certainly what 1.6.2 was working around when it raised the bats startup wait to 20s.
+- The test mock server no longer stalls in `server_bind`. `http.server` calls `socket.getfqdn()` on the address it binds, and a runner that cannot answer a reverse lookup for `127.0.0.1` blocks there until the DNS timeout — the socket is listening, but the port file appears seconds later and a caller waiting on it concludes the server never started. Observed on `macos-latest`, where the wrapper smoke test failed while the Linux and Windows runners passed; almost certainly the same thing 1.6.2 was working around when it raised the bats startup wait from 5s to 20s. The lookup is now skipped rather than waited out.
 - `make msrv` runs through `rustup run` rather than `cargo +<version>`, which only works when the rustup shim is first on `PATH`.
-- `make release-prep` actually edits `Cargo.toml` on macOS. It used sed's `0,/re/` address, which is a GNU extension that BSD sed ignores, so the target reported a version bump it had not made. It now verifies its own work by calling `version-check` before claiming success.
+- `make release-prep` no longer silently fails to bump the version. It edited `Cargo.toml` with sed's `0,/re/` address — a GNU extension that BSD sed ignores — so on a BSD userland, macOS included, it printed `stamped <version>` while leaving the file untouched. It now performs the edit portably and calls `version-check` on itself before reporting success.
 - `time` updated past RUSTSEC-2026-0009. The crate is never compiled — it arrives through a `ureq` feature that is off — but `Cargo.lock` records optional dependencies regardless, so `cargo audit` sees it even though `cargo deny` does not.
 - The docs site moved to Astro 7 and sharp 0.35, clearing ten Dependabot alerts, and the landing page no longer titles itself `notiflow | notiflow`.
 
 ### Changed
 
-- The installation docs no longer promise a GPG signature on every archive; cosign and the attestation are the constants, GPG appears when a signing key is configured.
+- The installation docs are explicit about which signatures are guaranteed: keyless cosign and the SLSA provenance attestation always, GPG on releases built after a signing key was configured for the workflow. `2.0.0-alpha.1` and `2.0.0-alpha.2` predate that key and carry no `.asc` files.
 
 ## [2.0.0-alpha.1] — 2026-08-10
 

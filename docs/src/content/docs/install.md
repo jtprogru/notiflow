@@ -93,10 +93,16 @@ Releases also carry [build provenance attestations](https://docs.github.com/en/a
 gh attestation verify "notiflow-${TARGET}.tar.gz" --repo jtprogru/notiflow
 ```
 
-Releases may additionally carry detached GPG signatures (`.asc` files next to each
-artefact). They are produced only when a signing key is configured for the release
-workflow, so check whether the file exists before relying on it — cosign and the
-attestation are the guarantees that are always there.
+Releases from `v2.0.0` onward also carry detached GPG signatures (`.asc` files next to
+each artefact), made with the maintainer's key:
+
+```bash
+curl -fsSLO "${BASE}/notiflow-${TARGET}.tar.gz.asc"
+gpg --verify "notiflow-${TARGET}.tar.gz.asc" "notiflow-${TARGET}.tar.gz"
+```
+
+The `2.0.0-alpha.1` and `2.0.0-alpha.2` pre-releases predate the signing key and have no
+`.asc` files. cosign and the attestation cover every release, including those two.
 
 ## Shell completions
 
