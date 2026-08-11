@@ -117,13 +117,31 @@ jobs:
             cosign sign-blob --bundle "${f}.bundle" "$f"
           done
 
+      # GPG is the third signature channel here, behind cosign and the provenance
+      # attestation. A missing key should degrade the release, not fail it — the first
+      # v2 tag died at this step with everything else already built and published.
+      - name: Is a GPG key configured?
+        id: gpg
+        env:
+          KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GPG_PRIVATE_KEY is not set; publishing without .asc signatures. \
+            cosign signatures and build provenance are unaffected."
+          fi
+
       - name: Import the GPG key
+        if: steps.gpg.outputs.available == 'true'
         uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
 
       - name: GPG-sign the archives and the checksum file
+        if: steps.gpg.outputs.available == 'true'
         env:
           PASSPHRASE: ${{ secrets.PASSPHRASE }}
         run: |
@@ -162,8 +180,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             dist/notiflow-*
-            dist/checksums.txt
-            dist/checksums.txt.asc
+            dist/checksums.txt*
 
   crates-io:
     name: Publish to crates.io
@@ -182,6 +199,9 @@ jobs:
     needs: publish
     # A pre-release should not become what `brew install notiflow` hands people.
     if: ${{ !contains(github.ref_name, '-') }}
+    # The tap lives in another repository; without its token there is nothing to push to.
+    # Failing the whole release over the formula would be the tail wagging the dog.
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - name: Check out the tap

@@ -93,8 +93,10 @@ Releases also carry [build provenance attestations](https://docs.github.com/en/a
 gh attestation verify "notiflow-${TARGET}.tar.gz" --repo jtprogru/notiflow
 ```
 
-The archives are additionally signed with the maintainer's GPG key (`.asc` files alongside
-each artefact).
+Releases may additionally carry detached GPG signatures (`.asc` files next to each
+artefact). They are produced only when a signing key is configured for the release
+workflow, so check whether the file exists before relying on it — cosign and the
+attestation are the guarantees that are always there.
 
 ## Shell completions
 
