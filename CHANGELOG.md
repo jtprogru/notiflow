@@ -2,6 +2,16 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] — 2026-08-11
+
+notiflow is a Rust binary. The GitHub Action downloads and runs it; the same binary is a standalone CLI from Homebrew, crates.io or a release archive. No bash, no `curl`, no `jq`, no `iconv`, no Python — one static executable on Linux, macOS and Windows.
+
+Identical in code to `2.0.0-rc.1`. What changes here is what the tag means: `v2` now points at this release, the Homebrew formula tracks it, and crates.io has a stable version. The itemised history lives in the pre-release sections — [`2.0.0-alpha.1`](https://github.com/jtprogru/notiflow/blob/main/CHANGELOG.md#200-alpha1--2026-08-10) for the rewrite itself and the defects it fixed, [`2.0.0-alpha.2`](https://github.com/jtprogru/notiflow/blob/main/CHANGELOG.md#200-alpha2--2026-08-11) and [`2.0.0-rc.1`](https://github.com/jtprogru/notiflow/blob/main/CHANGELOG.md#200-rc1--2026-08-11) for the release pipeline that ships it.
+
+For a workflow that sends to one chat, `jtprogru/notiflow@v1` → `@v2` is a drop-in change: same inputs, same outputs, same exit codes 10–16. The one breaking change is that `chat_id` no longer accepts a comma-separated list; use a job matrix or repeat the step, and you get per-chat outputs and per-chat status instead of a lossy CSV. Everything else that changed is a fix to behaviour that was already broken, and every difference is recorded in a parity corpus that runs both implementations against each other on every commit. See the [migration guide](https://jtprogru.github.io/notiflow/action/migration/).
+
+The bash implementation is frozen on the `v1.x` branch and receives security fixes only. The `v1` tag keeps pointing at it.
+
 ## [2.0.0-rc.1] — 2026-08-11
 
 Release-readiness work for `2.0.0`. Every item here is a path that had never executed: the code was ready before the pipeline that ships it was.
