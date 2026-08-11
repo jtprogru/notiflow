@@ -110,9 +110,16 @@ curl -fsSLO "${BASE}/notiflow-${TARGET}.tar.gz.asc"
 gpg --verify "notiflow-${TARGET}.tar.gz.asc" "notiflow-${TARGET}.tar.gz"
 ```
 
-Check the fingerprint above against what `gpg --import` reports. Fetching a key over the
-same channel as the thing it signs is a convenience, not a proof; the fingerprint is what
-you compare against a copy you got some other way.
+The same key is on `keys.openpgp.org`, which is the copy to prefer — it is not served by
+the project:
+
+```bash
+gpg --keyserver hkps://keys.openpgp.org --recv-keys 6FE573A70EEF276FCAB69C6413B959D00CEDAC9D
+```
+
+Either way, check the fingerprint against the one above. Fetching a key over the same
+channel as the thing it signs is a convenience, not a proof; the fingerprint is what you
+compare against a copy you got some other way.
 
 The `2.0.0-alpha.1` and `2.0.0-alpha.2` pre-releases predate the signing key and have no
 `.asc` files. cosign and the attestation cover every release, including those two.
