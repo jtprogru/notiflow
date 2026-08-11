@@ -22,6 +22,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # A published release used as a fixture for the end-to-end job. Release assets are
+  # immutable, so this is stable until somebody bumps it; bump it once v2.0.0 exists so the
+  # job covers the artefacts people actually install.
+  E2E_RELEASE: v2.0.0-alpha.2
+
 jobs:
   wrapper:
     name: Wrapper (${{ matrix.os }})
@@ -57,6 +63,92 @@ jobs:
             sudo apt-get update && sudo apt-get install -y bats jq
           fi
           make test-action
+
+  # `make action-smoke` above drives scripts/action/run.sh with a locally built binary, so
+  # it never touches the half of the Action that resolves a version, downloads a release,
+  # verifies it and puts it on PATH. That half only ever ran in users' workflows. This job
+  # runs the composite action itself, the way a caller does.
+  #
+  # `status: skipped` against a notify_on that excludes it means the binary reports and
+  # exits before any request, so no Telegram credentials are involved: what is under test
+  # is the install chain, not delivery, which the mock-server jobs already cover.
+  e2e:
+    name: Installed action (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      # Required by verify_signature; the Action deliberately does not install it itself.
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Run the action against a published release
+        id: run
+        uses: ./
+        with:
+          bot_token: 'not-a-real-token'
+          chat_id: '-1001234567890'
+          status: 'skipped'
+          notify_on: 'success,failure'
+          version: ${{ env.E2E_RELEASE }}
+          verify_signature: 'true'
+
+      - name: Assert the outputs of a skipped send
+        shell: bash
+        env:
+          OK: ${{ steps.run.outputs.ok }}
+          MESSAGE_ID: ${{ steps.run.outputs.message_id }}
+          HTTP_STATUS: ${{ steps.run.outputs.http_status }}
+          ERROR: ${{ steps.run.outputs.error }}
+        run: |
+          set -euo pipefail
+          fail=0
+          check() {
+            if [ "$2" != "$3" ]; then
+              echo "::error::output ${1}: expected '${3}', got '${2}'"
+              fail=1
+            fi
+          }
+          check ok "$OK" "false"
+          check message_id "$MESSAGE_ID" ""
+          check http_status "$HTTP_STATUS" "0"
+          check error "$ERROR" ""
+          exit "$fail"
+
+      - name: Assert the binary is on PATH at the version that was asked for
+        shell: bash
+        run: |
+          set -euo pipefail
+          reported="$(notiflow --version | awk '{print $2}')"
+          expected="${E2E_RELEASE#v}"
+          if [ "$reported" != "$expected" ]; then
+            echo "::error::notiflow on PATH reports ${reported}, expected ${expected}"
+            exit 1
+          fi
+          echo "notiflow ${reported} resolved from PATH"
+
+      # Same action, warm tool cache. The install step is what changes between the two runs,
+      # and a wrapper that only works against an empty directory is a wrapper that breaks on
+      # every second job.
+      - name: Run it again over the populated tool cache
+        id: rerun
+        uses: ./
+        with:
+          bot_token: 'not-a-real-token'
+          chat_id: '-1001234567890'
+          status: 'skipped'
+          notify_on: 'success,failure'
+          version: ${{ env.E2E_RELEASE }}
+
+      - name: The second run reports the same thing
+        shell: bash
+        env:
+          OK: ${{ steps.rerun.outputs.ok }}
+        run: |
+          [ "$OK" = "false" ] || { echo "::error::second run reported ok=${OK}"; exit 1; }
 
   manifest:
     name: action.yml manifest
