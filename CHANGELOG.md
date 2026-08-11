@@ -2,6 +2,25 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-alpha.2] — 2026-08-11
+
+Same code as `2.0.0-alpha.1`, which never produced a GitHub Release: the release workflow built and signed every artefact, published the crate, and then aborted importing a GPG key this repository does not hold. `2.0.0-alpha.1` exists on crates.io and nowhere else.
+
+### Fixed
+
+- The release no longer depends on GPG. Importing and signing are conditional and log a `::warning::` when skipped; keyless cosign signatures and the SLSA provenance attestation are unconditional and unaffected. The release file list uses globs so an absent `.asc` is not a missing-file failure.
+- The Homebrew job is `continue-on-error`. The tap is a separate repository, and a token problem there should not retroactively fail a release whose artefacts are already published.
+- `make dist` and the Action's `install.sh` no longer assume `zip` and `unzip` exist. Neither ships with git-bash, which is the bash a Windows runner provides; both now fall back to 7-Zip and then PowerShell.
+- The test mock server no longer stalls in `server_bind`. `http.server` calls `socket.getfqdn()` on the address it binds, and a runner that cannot answer a reverse lookup for `127.0.0.1` blocks there until the DNS timeout — the socket is listening but the port file appears seconds later. This is almost certainly what 1.6.2 was working around when it raised the bats startup wait to 20s.
+- `make msrv` runs through `rustup run` rather than `cargo +<version>`, which only works when the rustup shim is first on `PATH`.
+- `make release-prep` actually edits `Cargo.toml` on macOS. It used sed's `0,/re/` address, which is a GNU extension that BSD sed ignores, so the target reported a version bump it had not made. It now verifies its own work by calling `version-check` before claiming success.
+- `time` updated past RUSTSEC-2026-0009. The crate is never compiled — it arrives through a `ureq` feature that is off — but `Cargo.lock` records optional dependencies regardless, so `cargo audit` sees it even though `cargo deny` does not.
+- The docs site moved to Astro 7 and sharp 0.35, clearing ten Dependabot alerts, and the landing page no longer titles itself `notiflow | notiflow`.
+
+### Changed
+
+- The installation docs no longer promise a GPG signature on every archive; cosign and the attestation are the constants, GPG appears when a signing key is configured.
+
 ## [2.0.0-alpha.1] — 2026-08-10
 
 notiflow is now a Rust binary. The GitHub Action downloads and runs it; the same binary is also a standalone CLI. The bash implementation is frozen on the `v1.x` branch and kept in this tree under `tests/parity/v1/` as the reference the parity suite compares against.
