@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import sys
+import socketserver
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -58,10 +59,32 @@ FIXTURES = {
 }
 
 
+class FastBindServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer without the reverse-DNS lookup in its bind path.
+
+    http.server.HTTPServer.server_bind() calls socket.getfqdn() on the bound address. On a
+    CI runner whose resolver cannot answer a reverse lookup for 127.0.0.1, that call blocks
+    until the DNS timeout — the server binds, but the port file is written seconds later,
+    and a caller waiting on it concludes the server never started. Nothing here uses
+    server_name, so the lookup is pure cost.
+    """
+
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = host
+        self.server_port = port
+
+
 def make_handler(responses, log_path, counter, hang_seconds):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # silence stderr noise
             pass
+
+        def address_string(self):
+            # Default implementation reverse-resolves the client address; same DNS stall as
+            # server_bind, on every request instead of once.
+            return self.client_address[0]
 
         def do_POST(self):
             length = int(self.headers.get("Content-Length", "0"))
@@ -135,7 +158,7 @@ def main():
     counter = {"n": 0}
     handler = make_handler(responses, args.log, counter, args.hang_seconds)
 
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    server = FastBindServer(("127.0.0.1", 0), handler)
     server.daemon_threads = True
     port = server.server_address[1]
 
