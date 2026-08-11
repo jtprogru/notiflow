@@ -79,8 +79,9 @@ If you were pairing `edit_message_id` with a CSV `chat_id`, each matrix leg now 
 own `message_id` — which is what editing needed anyway, since the ids were never
 interchangeable between chats.
 
-Multi-chat fan-out is tracked as a feature request rather than deleted from memory. If you
-depended on it, that issue is the place to say so.
+Multi-chat fan-out is tracked as [a feature request](https://github.com/jtprogru/notiflow/issues/4) rather than deleted from memory.
+If you depended on it, that issue is the place to say so — it exists to collect the cases a
+matrix does not cover.
 
 ## Fixes that change observable behaviour
 

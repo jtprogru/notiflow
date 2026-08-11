@@ -10,7 +10,7 @@ For a workflow that sends to one chat, `jtprogru/notiflow@v1` → `@v2` is a dro
 
 ### Removed
 
-- **Breaking.** Multi-chat fan-out. `chat_id` accepts exactly one chat; a comma exits `11`. `edit_message_id` accepts one integer. The `message_id` output is a scalar rather than a CSV with empty slots, `error` is the raw reason without a `chat <id>:` prefix, and `http_status` is the status of the one request. Use a job matrix or repeated steps — both give per-chat outputs and per-chat status, which the aggregated CSV could not. Tracked as a feature request rather than deleted from memory.
+- **Breaking.** Multi-chat fan-out. `chat_id` accepts exactly one chat; a comma exits `11`. `edit_message_id` accepts one integer. The `message_id` output is a scalar rather than a CSV with empty slots, `error` is the raw reason without a `chat <id>:` prefix, and `http_status` is the status of the one request. Use a job matrix or repeated steps — both give per-chat outputs and per-chat status, which the aggregated CSV could not. Tracked as [a feature request](https://github.com/jtprogru/notiflow/issues/4) rather than deleted from memory.
 - The bash runtime, and with it the dependency on `bash`, `curl`, `jq`, `iconv`, `mktemp` and `python3`. Exit codes `20` (`UNSUPPORTED_BASH`) and `22` (`MISSING_DEPENDENCY`) are permanently reserved and never emitted.
 
 ### Added
