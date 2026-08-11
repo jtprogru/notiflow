@@ -51,10 +51,30 @@ if [ "${VERIFY_SIGNATURE:-false}" = "true" ]; then
     exit 1
   fi
   curl -fsSL --retry 3 -o "${tmp}/${archive}.bundle" "${base}/${archive}.bundle"
-  cosign verify-blob "${tmp}/${archive}" \
-    --bundle "${tmp}/${archive}.bundle" \
-    --certificate-identity-regexp "^https://github.com/${repo}/\.github/workflows/release\.yml@refs/tags/" \
-    --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+  blob="${tmp}/${archive}"
+  bundle="${blob}.bundle"
+  identity="^https://github.com/${repo}/\.github/workflows/release\.yml@refs/tags/"
+  issuer="https://token.actions.githubusercontent.com"
+
+  # cosign is a native Windows binary, and the bash calling it here is git-bash, which
+  # rewrites arguments on their way to one: POSIX paths become Windows paths, and anything
+  # else it decides looks path-shaped is rewritten too. The identity regexp is collateral —
+  # cosign reported a subject that visibly matched the pattern it had been given and
+  # refused it anyway. So the conversion is turned off and the two arguments that genuinely
+  # are paths are converted here instead. Outside MSYS there is no cygpath and the two
+  # variables mean nothing, so this is the same command it always was.
+  if command -v cygpath >/dev/null 2>&1; then
+    blob="$(cygpath -w "$blob")"
+    bundle="$(cygpath -w "$bundle")"
+  fi
+
+  echo "Verifying ${archive} against ${identity}"
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
+    cosign verify-blob "$blob" \
+    --bundle "$bundle" \
+    --certificate-identity-regexp "$identity" \
+    --certificate-oidc-issuer "$issuer"
   echo "Signature verified for ${archive}"
 fi
 
