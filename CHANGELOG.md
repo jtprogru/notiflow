@@ -2,9 +2,11 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.0.0-rc.1] — 2026-08-11
 
 Release-readiness work for `2.0.0`. Every item here is a path that had never executed: the code was ready before the pipeline that ships it was.
+
+This candidate exists to run that pipeline once for real. It is the first tag whose GPG signing step has a key to work with, the first to generate the Homebrew formula, and the first to publish to crates.io after the GitHub release rather than beside it. If it comes out clean, `2.0.0` is the same workflow with the pre-release gates open.
 
 ### Fixed
 
