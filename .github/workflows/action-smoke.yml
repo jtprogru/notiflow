@@ -24,9 +24,10 @@ permissions:
 
 env:
   # A published release used as a fixture for the end-to-end job. Release assets are
-  # immutable, so this is stable until somebody bumps it; bump it once v2.0.0 exists so the
-  # job covers the artefacts people actually install.
-  E2E_RELEASE: v2.0.0-alpha.2
+  # immutable, so this is stable until somebody bumps it. Point it at the current stable
+  # release, not a pre-release: the job is here to prove that what people actually install
+  # installs.
+  E2E_RELEASE: v2.0.0
 
 jobs:
   wrapper:
