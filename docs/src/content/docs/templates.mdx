@@ -1,0 +1,85 @@
+---
+title: Templates
+description: Placeholders, template precedence, and why substituted values are escaped but templates are not.
+---
+
+import { Content as Placeholders } from '../../generated/placeholders.md';
+import { Aside } from '@astrojs/starlight/components';
+
+## Which template is used
+
+Highest wins:
+
+1. `message` — verbatim. No substitution, no escaping.
+2. `template_<status>` matching the reported status.
+3. `message_template`.
+4. The built-in default.
+
+An empty string counts as "not set", so leaving an input blank falls through to the next
+level rather than sending an empty message.
+
+The built-in default:
+
+```
+{{.StatusEmoji}} *{{.Workflow}}* on `{{.Repo}}`
+Status: {{.Status}}
+Branch: {{.Branch}} @ {{.ShortSha}}
+Actor: {{.Actor}}
+[Open run]({{.RunUrl}})
+```
+
+## Placeholders
+
+<Placeholders />
+
+Inside a workflow the values come from the `GITHUB_*` environment. Outside one, the
+repository-shaped fields are recovered from the local git checkout: `Repo` from the
+`origin` remote, `Branch` and `Ref` from `HEAD`, `Sha` and `ShortSha` from the current
+commit, `Actor` from `git config user.name`. The run-specific fields — `RunId`,
+`RunNumber`, `RunUrl`, `EventName` — are empty, because there is no run.
+
+A placeholder that is known but has no value renders as an empty string. A placeholder
+that is not known at all is dropped, with an `UNKNOWN_PLACEHOLDER:<name>` warning — that
+is your typo detector.
+
+Anything that is not a well-formed `{{.Name}}` stays literal: `{{.}}`, `{{.1Bad}}`,
+`{{Repo}}` and `{{.Repo}` all come out exactly as written.
+
+## Escaping
+
+Only substituted values are escaped. The template body goes through verbatim.
+
+That split is what makes templates useful and safe at the same time: your template can
+contain real `*bold*` and `[links](...)`, while a branch named `fix/a.b-c` cannot inject
+markup into the result.
+
+```bash
+notiflow render --template '*branch:* {{.Branch}}' --set Branch='fix/a.b-c'
+# *branch:* fix/a\.b\-c
+```
+
+<Aside type="caution" title="message is not escaped">
+  `message` is verbatim, escaping included. If you build it from untrusted text — a PR
+  title, a commit message, a branch name — either use `parse_mode: none` or escape it
+  yourself. Prefer a template, which does it for you.
+</Aside>
+
+See [Parse modes](/notiflow/parse-modes/) for exactly what each mode escapes.
+
+## Length
+
+Telegram allows 4096 UTF-16 code units. Most characters cost one; emoji outside the basic
+plane cost two. A longer message is cut and ends with `...`.
+
+The cut lands between markup tokens, never inside one: a MarkdownV2 escape pair, an HTML
+entity and an HTML tag are each indivisible. In HTML mode any tags still open at the cut
+are closed, so the truncated message is still valid markup rather than a 400 from Telegram.
+
+## Debugging a template
+
+```bash
+notiflow render --template '…' --explain
+```
+
+`--explain` reports which template won, which parse mode is active, whether the text had
+to be truncated, and which placeholders were unknown — before you send anything.

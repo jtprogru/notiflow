@@ -1,0 +1,20 @@
+---
+title: Справочник CLI
+description: Все команды и флаги, сгенерированные из парсера аргументов.
+---
+
+import { Content as CliReference } from '../../../../generated/cli.md';
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="Сгенерировано">
+  Страница получается из дерева команд `clap` через `make gen`. CI падает, если
+  закоммиченная копия отличается от свежей генерации, так что отстать от бинаря она не
+  может. Тексты справки оставлены на английском — это то, что печатает `--help`.
+</Aside>
+
+<CliReference />
+
+## Где ещё
+
+`notiflow --help` печатает то же самое, а `notiflow <команда> --help` сужает до одной
+команды. API библиотеки документирован отдельно на [docs.rs](https://docs.rs/notiflow).

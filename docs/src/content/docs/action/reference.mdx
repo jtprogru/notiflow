@@ -1,0 +1,71 @@
+---
+title: Action reference
+description: Every input and output of the notiflow Action, generated from action.yml.
+---
+
+import { Content as ActionInputs } from '../../../generated/action-inputs.md';
+import { Content as ActionOutputs } from '../../../generated/action-outputs.md';
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="Generated">
+  Both tables are produced from `action.yml` by `make gen`, and CI fails when the committed
+  copy differs from a fresh generation. They cannot drift from the manifest.
+</Aside>
+
+## Inputs
+
+<ActionInputs />
+
+## Outputs
+
+<ActionOutputs />
+
+## Notes on individual inputs
+
+### `status`
+
+Required, with no default. Composite-action manifests evaluate `${{ }}` expressions when
+the manifest loads, before any job context exists, so `default: ${{ job.status }}` would
+abort the whole workflow with `Unrecognized named-value: 'job'`. Pass it from the caller:
+`${{ job.status }}` inside the job, `${{ needs.<job>.result }}` from another one.
+
+### `chat_id`
+
+One chat. An integer id — negative for groups and supergroups — or `@channelusername`
+between 4 and 32 word characters. A comma is rejected with exit code 11; see the
+[migration guide](/notiflow/action/migration/).
+
+### `parse_mode`
+
+`MarkdownV2` (default), `HTML`, or `none`. `Markdown` is accepted as an alias for
+`MarkdownV2` and logs a warning: notiflow escapes substituted values per V2 rules, and
+sending those to Telegram's legacy parser produces broken or rejected messages.
+
+### `disable_web_page_preview`
+
+The input name is unchanged from v1, but the wire representation moved to
+`link_preview_options.is_disabled`, because Telegram deprecated the flat field.
+
+### `edit_message_id`
+
+Turns the call into `editMessageText`. `disable_notification` and `message_thread_id` are
+dropped when editing — Telegram rejects them there, and passing them through would turn a
+working configuration into a 400.
+
+### `fail_on_error`
+
+`false` by default. A failed notification does not overwrite the result your job actually
+produced; set it to `true` when delivery is part of the contract.
+
+## Environment variables the Action reads
+
+The wrapper maps every input into an `NF_*` variable and hands it to the binary. Two more
+are read directly, and both are constrained inside a workflow:
+
+| Variable | Meaning |
+|---|---|
+| `NF_API_BASE` | Bot API base URL. Inside Actions only `https://api.telegram.org` and loopback are honoured — anything else is ignored with a warning, so a variable planted by an earlier step in the same job cannot redirect your token. |
+| `NF_BIN` | Path to the binary, for testing the wrapper against a local build. |
+
+From the CLI, `--api-base` accepts any `http(s)` URL: a self-hosted Bot API server is a
+legitimate setup and there the value is the user's own explicit choice.

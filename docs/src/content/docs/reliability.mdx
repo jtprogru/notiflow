@@ -1,0 +1,86 @@
+---
+title: Reliability
+description: What is retried, what is not, and what every exit code means.
+---
+
+import { Content as ExitCodes } from '../../generated/exit-codes.md';
+import { Aside } from '@astrojs/starlight/components';
+
+## The retry policy
+
+One attempt plus three retries by default — `--retries` changes the count.
+
+| Response | Treatment |
+|---|---|
+| `200` with `ok: true` | delivered |
+| `200` with `ok: false` | retried; Telegram's `description` is kept as the error |
+| `429` | retried after the server's requested delay |
+| `5xx` | retried with exponential backoff |
+| network failure, timeout, DNS | retried with exponential backoff, reported as HTTP 0 |
+| any other `4xx` | **not** retried |
+
+A `4xx` is terminal on purpose. A revoked token, a chat the bot was removed from, or a
+message Telegram cannot parse will answer identically for as long as you keep asking; the
+only thing retrying adds is delay before you see the real problem.
+
+### Backoff
+
+1s, 2s, 4s, plus up to 50% jitter.
+
+The jitter is not decoration. When a fleet of jobs notifies the same chat and hits the rate
+limit together, a fixed schedule makes all of them retry on the same second and trigger the
+limit again. Spreading them out is the difference between recovering and oscillating.
+
+### Rate limits
+
+On a `429`, notiflow waits for `parameters.retry_after` from the body; failing that, the
+`Retry-After` response header; failing that, one second. Proxies and self-hosted Bot API
+servers tend to send the header rather than the body field, which is why both are read.
+
+The delay is capped at `--max-retry-after` (60s by default). Telegram occasionally asks for
+minutes, and a workflow step that sits idle for that long is usually worse than a missed
+notification.
+
+### Timeouts
+
+`--connect-timeout` (5s) bounds the TCP and TLS handshake; `--timeout` (15s) bounds the
+whole request. Exceeding either counts as a network failure and follows the backoff path.
+
+## Failure and your job's result
+
+By default a failed notification exits 0. Your build's result is the thing people act on,
+and overwriting it because Telegram had a bad minute makes the signal worse, not better.
+
+`fail_on_error: true` (or `--fail-on-error`) inverts that when delivery genuinely is part
+of the contract. The exit code becomes 1 and the `error` output carries the reason.
+
+## Exit codes
+
+<ExitCodes />
+
+<Aside type="note" title="Generated">
+  This table is produced from the error type by `make gen`; CI fails when the committed
+  copy has drifted.
+</Aside>
+
+Codes 10–16 are inherited verbatim from notiflow v1, so a workflow that branches on them
+keeps working across the upgrade. 20 and 22 belonged to the bash runtime — a static binary
+has no bash to be too old and no `curl` to be missing — and are permanently reserved rather
+than reused.
+
+## Diagnosing a failure
+
+Start with the `error` output or the JSON report: when Telegram gave a reason, that is the
+reason verbatim.
+
+| Symptom | Usual cause |
+|---|---|
+| `401 Unauthorized` | wrong or revoked token — check with `notiflow whoami` |
+| `400 Bad Request: chat not found` | wrong `chat_id`, or the bot was never added to the chat |
+| `403 Forbidden` | the bot is in the chat but not allowed to post; for a channel it needs to be an administrator |
+| `400 ... can't parse entities` | verbatim `message` with markup in it — see [Parse modes](/notiflow/parse-modes/) |
+| `429` on every attempt | too many messages to the same chat; raise `--max-retry-after` or send fewer |
+| HTTP 0 | never reached the server — network, DNS, or a proxy on the runner |
+
+`-v` adds retry decisions to stderr; `-vv` adds debug detail. Neither can print the token:
+everything notiflow writes goes through a redaction filter first.
