@@ -46,5 +46,16 @@ case "$v" in
   *) v="v${v}" ;;
 esac
 
+# v1 was the bash implementation: its releases carry no binary archive, so install.sh can
+# only 404 on one. The `latest` fallback walks into this today, because the newest release
+# that is not a pre-release is still a v1 tag; without this check the failure surfaces as a
+# bare curl error against a URL nobody asked for.
+major="${v#v}"
+major="${major%%.*}"
+if ! printf '%s' "$major" | grep -Eq '^[0-9]+$' || [ "$major" -lt 2 ]; then
+  echo "::error::resolved notiflow ${v} (via ${source}), but this Action installs a binary that only exists from v2.0.0 onward. Pin the 'version' input to a v2 release." >&2
+  exit 1
+fi
+
 echo "version=${v}" >>"$GITHUB_OUTPUT"
 echo "Resolved notiflow version: ${v} (via ${source})"
