@@ -5,6 +5,10 @@
 [![docs.rs](https://img.shields.io/docsrs/notiflow)](https://docs.rs/notiflow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+<p align="center">
+  <img src="assets/cover.svg" alt="notiflow — Telegram notifier for CI and the terminal: a GitHub Action and a CLI in one Rust binary" width="900">
+</p>
+
 Send a Telegram message when something finishes — a workflow job, a deploy script, a long build.
 
 The GitHub Action and the `notiflow` CLI are the same Rust binary, so a template that renders in your workflow renders identically in your terminal. No bash, no `curl`, no `jq`, no Python: one static executable, on Linux, macOS and Windows.

@@ -21,6 +21,10 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
+{/* Lives in public/ rather than src/assets/ so the same file can be a symlink to the
+    repository-root assets/cover.svg that the README embeds. */}
+![notiflow — Telegram notifier for CI and the terminal: a GitHub Action and a CLI in one Rust binary](/notiflow/cover.svg)
+
 <CardGrid stagger>
   <Card title="One binary, two faces" icon="rocket">
     The GitHub Action and the `notiflow` CLI are the same Rust binary. A template that

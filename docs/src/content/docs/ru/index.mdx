@@ -19,6 +19,10 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
+{/* Файл лежит в public/, а не в src/assets/, чтобы это был симлинк на assets/cover.svg
+    в корне репозитория — ту же картинку встраивает README. */}
+![notiflow — Telegram-нотификатор для CI и терминала: GitHub Action и CLI в одном бинаре на Rust](/notiflow/cover.svg)
+
 <CardGrid stagger>
   <Card title="Один бинарь, два лица" icon="rocket">
     GitHub Action и CLI `notiflow` — это один и тот же бинарь на Rust. Шаблон, который
