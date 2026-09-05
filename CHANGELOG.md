@@ -2,6 +2,17 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] — 2026-09-05
+
+A maintenance release. Nothing about the CLI or the Action behaves differently: the only change inside the shipped binary is a patch bump of the `toml` crate, and everything else since `2.0.0` is the documentation site and CI. It exists so the published artefacts, the crate and the Homebrew formula are built from the current dependency tree rather than a month-old one.
+
+### Changed
+
+- `toml` 1.1.4 → 1.1.5.
+- The docs site runs on Starlight 0.42.0, which raises its minimum browsers to Chromium 116, Safari 17.0 and Firefox 125. The site is unaffected otherwise: it sets no `tagline` and overrides no Starlight component.
+- Dependabot no longer proposes TypeScript majors for the docs site. `@astrojs/check@0.9.10` declares peer `typescript@"^5.0.0 || ^6.0.0"`, so a bump to 7.x made `npm ci` fail with `ERESOLVE` and took the whole grouped update down with it, blocking three unrelated bumps behind one unsatisfiable peer ([#24](https://github.com/jtprogru/notiflow/issues/24)). The ignore comes off when `@astrojs/check` accepts TypeScript 7.
+- The README and both docs landing pages carry a project cover.
+
 ## [2.0.0] — 2026-08-11
 
 notiflow is a Rust binary. The GitHub Action downloads and runs it; the same binary is a standalone CLI from Homebrew, crates.io or a release archive. No bash, no `curl`, no `jq`, no `iconv`, no Python — one static executable on Linux, macOS and Windows.
