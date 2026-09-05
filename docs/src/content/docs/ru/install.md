@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/jtprogru/notiflow/main/scripts/inst
 сборку `musl`.
 
 ```bash
-curl -fsSL .../install.sh | sh -s -- --version v2.0.0 --bin-dir ~/.local/bin
+curl -fsSL .../install.sh | sh -s -- --version v2.0.1 --bin-dir ~/.local/bin
 ```
 
 Скачать скрипт из интернета прямо в шелл — ровно столько доверия, сколько это и звучит.
@@ -50,7 +50,7 @@ curl -fsSL .../install.sh | sh -s -- --version v2.0.0 --bin-dir ~/.local/bin
 на каждый архив.
 
 ```bash
-VERSION=v2.0.0
+VERSION=v2.0.1
 TARGET=aarch64-apple-darwin        # таблица ниже
 BASE="https://github.com/jtprogru/notiflow/releases/download/${VERSION}"
 

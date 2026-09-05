@@ -37,7 +37,7 @@ the release's `checksums.txt`, and installs into `/usr/local/bin`. On a system w
 glibc it picks the static `musl` build automatically.
 
 ```bash
-curl -fsSL .../install.sh | sh -s -- --version v2.0.0 --bin-dir ~/.local/bin
+curl -fsSL .../install.sh | sh -s -- --version v2.0.1 --bin-dir ~/.local/bin
 ```
 
 Piping a script from the internet into a shell is exactly as much trust as it sounds like.
@@ -50,7 +50,7 @@ Every release publishes a static binary per platform, plus `checksums.txt` and a
 bundle for each archive.
 
 ```bash
-VERSION=v2.0.0
+VERSION=v2.0.1
 TARGET=aarch64-apple-darwin        # see the table below
 BASE="https://github.com/jtprogru/notiflow/releases/download/${VERSION}"
 

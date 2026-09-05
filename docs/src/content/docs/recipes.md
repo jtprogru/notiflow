@@ -174,7 +174,7 @@ The `musl` archives are fully static, so they run on `alpine` and even `scratch`
 
 ```dockerfile
 FROM alpine
-ADD https://github.com/jtprogru/notiflow/releases/download/v2.0.0/notiflow-x86_64-unknown-linux-musl.tar.gz /tmp/
+ADD https://github.com/jtprogru/notiflow/releases/download/v2.0.1/notiflow-x86_64-unknown-linux-musl.tar.gz /tmp/
 RUN tar -xzf /tmp/notiflow-x86_64-unknown-linux-musl.tar.gz -C /usr/local/bin
 ```
 
