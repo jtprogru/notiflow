@@ -23,3 +23,9 @@ updates:
     groups:
       docs:
         patterns: ["*"]
+    ignore:
+      # @astrojs/check declares peer typescript "^5.0.0 || ^6.0.0", so a major
+      # bump of typescript makes `npm ci` fail with ERESOLVE and takes the whole
+      # docs group down with it. Drop this once @astrojs/check accepts TS 7.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
