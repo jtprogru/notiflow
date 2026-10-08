@@ -24,8 +24,11 @@ updates:
 
   - package-ecosystem: npm
     directory: "/docs"
+    # Dependabot cannot be told to check indirect npm dependencies the way it can
+    # for cargo, so everything beneath the packages in package.json moves only
+    # with a direct bump or a security update. A weekly run keeps that frequent.
     schedule:
-      interval: monthly
+      interval: weekly
     groups:
       docs:
         patterns: ["*"]
