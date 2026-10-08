@@ -12,6 +12,12 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    # Without this only the crates named in Cargo.toml are checked, and the rest
+    # of Cargo.lock moves only when one of them drags it along. That is how rustls
+    # sat on a version with RUSTSEC-2026-0285 for three weeks: it comes in through
+    # ureq, and no Dependabot alert was raised for it either.
+    allow:
+      - dependency-type: all
     groups:
       cargo-minor-and-patch:
         update-types: ["minor", "patch"]
