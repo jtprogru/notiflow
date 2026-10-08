@@ -27,6 +27,11 @@ updates:
     # Dependabot cannot be told to check indirect npm dependencies the way it can
     # for cargo, so everything beneath the packages in package.json moves only
     # with a direct bump or a security update. A weekly run keeps that frequent.
+    # docs/package.json carries an `overrides` entry that lifts postcss-nested to 7
+    # under @expressive-code/core: its ^6 range pins a postcss-selector-parser with
+    # GHSA-rj75-hqrm-r3gf, which has no fixed 6.x, and JSON has no room for this
+    # note. Drop the override once @expressive-code/core asks for postcss-nested 7
+    # or newer by itself.
     schedule:
       interval: weekly
     groups:
