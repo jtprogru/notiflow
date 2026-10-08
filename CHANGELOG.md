@@ -2,6 +2,22 @@
 
 All notable changes are documented in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.2] — 2026-10-08
+
+A maintenance and security release. The CLI and the Action behave exactly as they did in `2.0.1`: no input, output or exit code is touched. What changes is the dependency tree the binary is built from and the pipeline that signs and ships it.
+
+### Security
+
+- `rustls` 0.23.43 → 0.23.45, which fixes [RUSTSEC-2026-0285](https://rustsec.org/advisories/RUSTSEC-2026-0285). rustls accepted TLS 1.3 handshake messages sent at the wrong encryption level, so a peer could send in plaintext what should have been encrypted without the connection being rejected. The handshake transcript is still authenticated and a network attacker cannot use this to alter or complete a handshake, but this is the TLS stack every request to Telegram goes through.
+
+### Changed
+
+- Every crate in `Cargo.lock` is at the newest release its dependents allow. Among the direct dependencies that is `clap` 4.6.6 → 4.6.7, `clap_complete` 4.6.9 → 4.6.11, `thiserror` 2.0.20 → 2.0.21, `toml` 1.1.5 → 1.1.7 and `ureq` 3.4.0 → 3.4.2.
+- Release archives are signed with cosign 3. The `.bundle` beside each archive is now a Sigstore bundle (`application/vnd.dev.sigstore.bundle.v0.3+json`) carrying an RFC 3161 timestamp, where earlier releases shipped cosign's older JSON layout. Nothing changes for whoever verifies: the `cosign verify-blob` command in the installation docs and the Action's `verify_signature` input work as they are, and bundles signed this way were checked with cosign 2.4.3, 2.5.2, 2.6.1 and 3.0.6 before the tag. Versions older than 2.4.3 were not tried.
+- Every GitHub Action the workflows and `action.yml` use is pinned to a commit SHA rather than a tag. For `action.yml` that is `actions/cache`, at the commit `v6` pointed to, so the Action runs the same code as before.
+- Dependabot checks the whole of `Cargo.lock`, not only the crates named in `Cargo.toml`, and the docs group runs weekly. `rustls` is a transitive dependency, which is why the advisory above stayed in the tree for three weeks.
+- The docs site runs on Starlight 0.42.5, Astro 7.3.7 and TypeScript 6.0.3, with every npm advisory against its build toolchain cleared.
+
 ## [2.0.1] — 2026-09-05
 
 A maintenance release. Nothing about the CLI or the Action behaves differently: the only change inside the shipped binary is a patch bump of the `toml` crate, and everything else since `2.0.0` is the documentation site and CI. It exists so the published artefacts, the crate and the Homebrew formula are built from the current dependency tree rather than a month-old one.
