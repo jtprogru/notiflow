@@ -272,7 +272,6 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
           sha() { sha256sum "dist/$1" | awk '{print $1}'; }
           url() { echo "https://github.com/jtprogru/notiflow/releases/download/${TAG}/$1"; }
 
@@ -282,11 +281,14 @@ jobs:
           LINUX_ARM="notiflow-aarch64-unknown-linux-gnu.tar.gz"
 
           mkdir -p Formula
+          # No `version` stanza: brew scans it out of the /download/<tag>/ part of
+          # the URLs, and the tap's brew audit fails an explicit one as redundant.
+          # It was removed by hand in the tap twice and this generator put it back
+          # both times, so the fix lives here.
           cat <<EOL > Formula/notiflow.rb
           class Notiflow < Formula
             desc "Telegram notifier for CI and the terminal"
             homepage "https://jtprogru.github.io/notiflow/"
-            version "${VERSION}"
             license "MIT"
 
             on_macos do
